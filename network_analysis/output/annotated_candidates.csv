@@ -1,0 +1,99 @@
+gene,group,fc_caz,fc_kan,regulators,best_tf,best_tf_type,best_tf_spec,has_cross_reactive_regulator,regulatory_clarity,biosensor_flag,note
+ygey,caz,5.696,0.0,,,,,False,,?,no regulator in RegulonDB
+ygew,caz,5.189,0.0,crp,crp,TF,1.0,False,1.0,✓,
+ygap,caz,4.967,0.0,nac,nac,TF,0.6,True,0.36,✗,
+ygex,caz,4.896,0.0,,,,,False,,?,no regulator in RegulonDB
+ygav,caz,4.704,0.0,nac,nac,TF,0.6,True,0.36,✗,
+alax,caz,4.471,0.0,"fis, rpod",fis,TF,1.0,True,0.6,⊙,
+tdcf,caz,4.306,0.0,"crp, fnr, ihf, tdca, tdcr",crp,TF,1.0,True,0.6,⊙,
+uact,caz,4.281,0.0,,,,,False,,?,no regulator in RegulonDB
+nanc,caz,4.218,0.0,"crp, nagc, nanr, spf",nanr,TF,1.0,False,1.0,✓,
+ygfm,caz,3.933,0.0,,,,,False,,?,no regulator in RegulonDB
+xdhd,caz,3.89,0.0,,,,,False,,?,no regulator in RegulonDB
+dgcz,caz,3.754,0.0,"carbon storage regulator csra, cpxr, cysb, h-ns, lrp, rpod",carbon storage regulator csra,TF,1.0,True,0.6,⊙,
+yqik,caz,3.653,0.0,,,,,False,,?,no regulator in RegulonDB
+hyua,caz,3.618,0.0,,,,,False,,?,no regulator in RegulonDB
+recn,caz,3.586,0.0,"dnaa, fur, lexa, rpod",lexa,TF,1.0,True,0.6,⊙,
+cara,caz,3.543,0.0,"arca, argr, cpxr, fis, ihf, pepa, purr, rpod, rutr",argr,TF,1.0,True,0.6,⊙,
+uraa,caz,3.537,0.0,"fnr, rpod",rpod,sigma,0.727,True,0.436,✗,
+ynfn,caz,3.475,0.0,,,,,False,,?,no regulator in RegulonDB
+yhdu,caz,3.449,0.0,,,,,False,,?,no regulator in RegulonDB
+tdce,caz,3.414,0.0,"crp, fnr, ihf, tdca, tdcr",crp,TF,1.0,True,0.6,⊙,
+leuv,caz,3.33,0.0,"fis, ppgpp, rpod",fis,TF,1.0,True,0.6,⊙,
+ssna,caz,3.284,0.0,"rpod, rpon",rpon,sigma,0.75,True,0.45,✗,
+rcsa,caz,3.27,0.0,"gade, h-ns, nac, rcsab, rpod",rcsab,TF,1.0,True,0.6,⊙,
+tnac,caz,3.244,0.0,"crp, nac, rpod, torr",torr,TF,1.0,True,0.6,⊙,
+ygfk,caz,3.234,0.0,rpon,rpon,sigma,0.75,True,0.45,✗,
+cspf,caz,3.207,0.0,,,,,False,,?,no regulator in RegulonDB
+sdhc,caz,3.161,0.0,"arca, cpxr, crp, fnr, fur, nac, rpod, rybb, ryhb, spf",arca,TF,1.0,True,0.6,⊙,
+ynek,caz,3.154,0.0,nac,nac,TF,0.6,True,0.36,✗,
+ygil,caz,3.114,0.0,nac,nac,TF,0.6,True,0.36,✗,
+yeiw,caz,3.062,0.0,crp,crp,TF,1.0,False,1.0,✓,
+insf2,caz,3.042,0.0,,,,,False,,?,no regulator in RegulonDB
+cspi,caz,2.986,0.0,"basr, fis",basr,TF,1.0,False,1.0,✓,
+tyrt,caz,2.935,0.0,"fis, ppgpp, rpod",fis,TF,1.0,True,0.6,⊙,
+mdti,caz,2.926,0.0,"acrr, h-ns, rpod",acrr,TF,1.0,True,0.6,⊙,
+ycgx,caz,2.917,0.0,nac,nac,TF,0.6,True,0.36,✗,
+pspa,caz,2.911,0.0,"ihf, pspf, rpon",pspf,TF,1.0,True,0.6,⊙,
+suhb,caz,2.882,0.0,,,,,False,,?,no regulator in RegulonDB
+rhle,caz,2.88,0.0,cecr,cecr,TF,1.0,False,1.0,✓,
+mqo,caz,2.839,0.0,"arca, fur, lrp",arca,TF,1.0,True,0.6,⊙,
+ycgz,caz,2.835,0.0,"blur, mara, rpod, rpos",blur,TF,1.0,True,0.6,⊙,
+qued,caz,2.828,0.0,nac,nac,TF,0.6,True,0.36,✗,
+ydeo,caz,2.821,0.0,"csra, evga, glar, h-ns, phop, rcsb, rpod, rpoh, ydeo",phop,TF,1.0,True,0.6,⊙,
+marr,caz,2.802,0.0,"acrr, cpxr, cra, crp, fis, mara, marr, nac, rob, rpod, soxs",fis,TF,1.0,True,0.6,⊙,
+xanq,caz,2.766,0.0,,,,,False,,?,no regulator in RegulonDB
+cbrb,caz,2.765,0.0,"creb, nac",creb,TF,1.0,True,0.6,⊙,
+mett,caz,2.748,0.0,"fis, lrp, ppgpp, rpod",fis,TF,1.0,True,0.6,⊙,
+yeeh,caz,2.744,0.0,,,,,False,,?,no regulator in RegulonDB
+yfhl,caz,2.738,0.0,nac,nac,TF,0.6,True,0.36,✗,
+ydfu,cross,2.868,7.21,,,,,False,,?,no regulator in RegulonDB
+yahm,cross,2.812,6.963,,,,,False,,?,no regulator in RegulonDB
+gfcc,kan,0.0,9.302,,,,,False,,?,no regulator in RegulonDB
+ompg,kan,0.0,9.164,ycjw,ycjw,TF,1.0,False,1.0,✓,
+ydet,kan,0.0,9.019,,,,,False,,?,no regulator in RegulonDB
+ydes,kan,0.0,8.723,,,,,False,,?,no regulator in RegulonDB
+ytfa,kan,0.0,8.412,,,,,False,,?,no regulator in RegulonDB
+rybb,kan,0.0,8.311,"dksa, nsrr, rpoe",dksa,TF,1.0,False,1.0,✓,
+ynba,kan,0.0,8.033,rcsb-bglj,rcsb-bglj,TF,1.0,False,1.0,✓,
+ydin,kan,0.0,8.024,,,,,False,,?,no regulator in RegulonDB
+mata,kan,0.0,7.798,"cpxr, mata, rpoe",rpoe,sigma,1.0,True,0.6,⊙,
+yfcv,kan,0.0,7.657,"fur, glar",glar,TF,0.667,True,0.4,✗,
+sfmh,kan,0.0,7.58,,,,,False,,?,no regulator in RegulonDB
+yght,kan,0.0,7.563,nac,nac,TF,0.4,True,0.24,✗,
+yjjq,kan,0.0,7.146,"glar, h-ns, leuo, rpod",leuo,TF,1.0,True,0.6,⊙,
+ynbb,kan,0.0,7.102,rcsb-bglj,rcsb-bglj,TF,1.0,False,1.0,✓,
+ykfi,kan,0.0,7.064,flia,flia,sigma,1.0,False,1.0,✓,
+pdel,kan,0.0,7.056,"cra, h-ns, nac, pdel, rpod",cra,TF,0.5,True,0.3,✗,
+ibpb,kan,0.0,7.054,"ihf, lrp, rpoh, rpon, small heat shock protein ibpa",small heat shock protein ibpa,TF,1.0,True,0.6,⊙,
+ybfg,kan,0.0,7.007,rpoe,rpoe,sigma,1.0,False,1.0,✓,
+ykgq,kan,0.0,6.983,,,,,False,,?,no regulator in RegulonDB
+eaeh,kan,0.0,6.874,,,,,False,,?,no regulator in RegulonDB
+rusa,kan,0.0,6.854,,,,,False,,?,no regulator in RegulonDB
+yjhe,kan,0.0,6.835,,,,,False,,?,no regulator in RegulonDB
+acre,kan,0.0,6.748,"fnr, h-ns, nac, rpod, zrar",zrar,TF,1.0,True,0.6,⊙,
+yghf,kan,0.0,6.707,"fur, rpoe",rpoe,sigma,1.0,True,0.6,⊙,
+soka,kan,0.0,6.677,,,,,False,,?,no regulator in RegulonDB
+pinh,kan,0.0,6.636,,,,,False,,?,no regulator in RegulonDB
+yfdo,kan,0.0,6.589,srsr,srsr,TF,1.0,False,1.0,✓,
+prfh,kan,0.0,6.545,,,,,False,,?,no regulator in RegulonDB
+ydda,kan,0.0,6.509,fur,fur,TF,0.571,True,0.343,✗,
+ycjm,kan,0.0,6.506,ycjw,ycjw,TF,1.0,False,1.0,✓,
+ytha,kan,0.0,6.504,,,,,False,,?,no regulator in RegulonDB
+ycjn,kan,0.0,6.466,ycjw,ycjw,TF,1.0,False,1.0,✓,
+djlb,kan,0.0,6.441,,,,,False,,?,no regulator in RegulonDB
+yeha,kan,0.0,6.434,,,,,False,,?,no regulator in RegulonDB
+metv,kan,0.0,6.311,"fnr, ppgpp, rpod",fnr,TF,0.429,True,0.257,✗,
+wcaf,kan,0.0,6.308,nac,nac,TF,0.4,True,0.24,✗,
+bglh,kan,0.0,6.301,nac,nac,TF,0.4,True,0.24,✗,
+sfmd,kan,0.0,6.23,,,,,False,,?,no regulator in RegulonDB
+ohsc,kan,0.0,6.227,rpod,rpod,sigma,0.273,True,0.164,✗,
+ydeq,kan,0.0,6.218,nac,nac,TF,0.4,True,0.24,✗,
+ymde,kan,0.0,6.173,,,,,False,,?,no regulator in RegulonDB
+ylbi,kan,0.0,6.167,,,,,False,,?,no regulator in RegulonDB
+insh4,kan,0.0,6.152,,,,,False,,?,no regulator in RegulonDB
+yber,kan,0.0,6.143,nac,nac,TF,0.4,True,0.24,✗,
+yfdn,kan,0.0,6.081,srsr,srsr,TF,1.0,False,1.0,✓,
+yder,kan,0.0,6.068,,,,,False,,?,no regulator in RegulonDB
+yehl,kan,0.0,6.06,lrp,lrp,TF,0.4,True,0.24,✗,
+fepe,kan,0.0,6.054,"fnr, fur, h-ns, nac, rpod",fur,TF,0.571,True,0.343,✗,

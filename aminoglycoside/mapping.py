@@ -1,9 +1,12 @@
+from pathlib import Path
 import pandas as pd
 import re
 
+DATA_ROOT = Path(__file__).parent.parent / 'data' 
+
 # Parse GTF to extract ER3413 ID to gene name mapping
 mapping = {}
-with open('/Users/nichitabulbuc/Desktop/DE_analysis/ecoli_annotation.gtf', 'r') as f:
+with open(DATA_ROOT / 'ecoli_K12_MG1655.gtf.tar.gz', 'r') as f:
     for line in f:
         if 'old_locus_tag' in line and 'gene_id' in line:
             old = re.search(r'old_locus_tag "([^"]+)"', line)
@@ -16,10 +19,10 @@ with open('/Users/nichitabulbuc/Desktop/DE_analysis/ecoli_annotation.gtf', 'r') 
 print(f"Mapped {len(mapping)} genes")
 
 # Load candidates
-candidates = pd.read_csv('/Users/nichitabulbuc/Desktop/DE_analysis/gentamicin_candidates.csv')
+candidates = pd.read_csv(Path(__file__).parent / 'gentamicin_candidates.csv')
 
 # Map gene names
 candidates['gene'] = candidates['gene_id'].map(mapping)
 
 print(candidates[['gene_id', 'gene', 'log2FC']].head(20))
-candidates.to_csv('/Users/nichitabulbuc/Desktop/DE_analysis/gentamicin_candidates_named.csv', index=False)
+candidates.to_csv((Path(__file__).parent / 'gentamicin_candidates_named.csv'), index=False)

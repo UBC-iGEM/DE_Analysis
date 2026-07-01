@@ -1,0 +1,58 @@
+tf,regulator_type,n_caz_targets,n_kan_targets,n_cross_targets,n_total_targets,specificity_caz,specificity_kan,is_cross_reactive,dominant_class,target_genes
+rpod,sigma,16,6,0,22,0.727,0.273,True,beta-lactam,"acre, alax, cara, dgcz, fepe, leuv, marr, mdti, mett, metv, ohsc, pdel, rcsa, recn, sdhc, ssna, tnac, tyrt, uraa, ycgz, ydeo, yjjq"
+nac,TF,12,8,0,20,0.6,0.4,True,beta-lactam,"acre, bglh, cbrb, fepe, marr, pdel, qued, rcsa, sdhc, tnac, wcaf, yber, ycgx, ydeq, yfhl, ygap, ygav, yght, ygil, ynek"
+h-ns,TF,4,4,0,8,0.5,0.5,True,mixed,"acre, dgcz, fepe, mdti, pdel, rcsa, ydeo, yjjq"
+crp,TF,8,0,0,8,1.0,0.0,False,beta-lactam,"marr, nanc, sdhc, tdce, tdcf, tnac, yeiw, ygew"
+fis,TF,7,0,0,7,1.0,0.0,False,beta-lactam,"alax, cara, cspi, leuv, marr, mett, tyrt"
+fur,TF,3,4,0,7,0.429,0.571,True,aminoglycoside,"fepe, mqo, recn, sdhc, ydda, yfcv, yghf"
+fnr,TF,4,3,0,7,0.571,0.429,True,beta-lactam,"acre, fepe, metv, sdhc, tdce, tdcf, uraa"
+lrp,TF,3,2,0,5,0.6,0.4,True,beta-lactam,"dgcz, ibpb, mett, mqo, yehl"
+ihf,TF,4,1,0,5,0.8,0.2,True,beta-lactam,"cara, ibpb, pspa, tdce, tdcf"
+cpxr,TF,4,1,0,5,0.8,0.2,True,beta-lactam,"cara, dgcz, marr, mata, sdhc"
+rpoe,sigma,0,4,0,4,0.0,1.0,False,aminoglycoside,"mata, rybb, ybfg, yghf"
+ppgpp,effector,3,1,0,4,0.75,0.25,True,beta-lactam,"leuv, mett, metv, tyrt"
+rpon,sigma,3,1,0,4,0.75,0.25,True,beta-lactam,"ibpb, pspa, ssna, ygfk"
+ycjw,TF,0,3,0,3,0.0,1.0,False,aminoglycoside,"ompg, ycjm, ycjn"
+glar,TF,1,2,0,3,0.333,0.667,True,aminoglycoside,"ydeo, yfcv, yjjq"
+arca,TF,3,0,0,3,1.0,0.0,False,beta-lactam,"cara, mqo, sdhc"
+rpoh,sigma,1,1,0,2,0.5,0.5,True,mixed,"ibpb, ydeo"
+cra,TF,1,1,0,2,0.5,0.5,True,mixed,"marr, pdel"
+tdcr,TF,2,0,0,2,1.0,0.0,False,beta-lactam,"tdce, tdcf"
+mara,TF,2,0,0,2,1.0,0.0,False,beta-lactam,"marr, ycgz"
+acrr,TF,2,0,0,2,1.0,0.0,False,beta-lactam,"marr, mdti"
+rcsb-bglj,TF,0,2,0,2,0.0,1.0,False,aminoglycoside,"ynba, ynbb"
+tdca,TF,2,0,0,2,1.0,0.0,False,beta-lactam,"tdce, tdcf"
+spf,TF,2,0,0,2,1.0,0.0,False,beta-lactam,"nanc, sdhc"
+srsr,TF,0,2,0,2,0.0,1.0,False,aminoglycoside,"yfdn, yfdo"
+basr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cspi
+leuo,TF,0,1,0,1,0.0,1.0,False,aminoglycoside,yjjq
+dksa,TF,0,1,0,1,0.0,1.0,False,aminoglycoside,rybb
+pepa,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cara
+nanr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,nanc
+rcsab,TF,1,0,0,1,1.0,0.0,False,beta-lactam,rcsa
+nagc,TF,1,0,0,1,1.0,0.0,False,beta-lactam,nanc
+soxs,TF,1,0,0,1,1.0,0.0,False,beta-lactam,marr
+blur,TF,1,0,0,1,1.0,0.0,False,beta-lactam,ycgz
+argr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cara
+rob,TF,1,0,0,1,1.0,0.0,False,beta-lactam,marr
+cecr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,rhle
+rutr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cara
+carbon storage regulator csra,TF,1,0,0,1,1.0,0.0,False,beta-lactam,dgcz
+gade,TF,1,0,0,1,1.0,0.0,False,beta-lactam,rcsa
+torr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,tnac
+rpos,sigma,1,0,0,1,1.0,0.0,False,beta-lactam,ycgz
+pspf,TF,1,0,0,1,1.0,0.0,False,beta-lactam,pspa
+phop,TF,1,0,0,1,1.0,0.0,False,beta-lactam,ydeo
+evga,TF,1,0,0,1,1.0,0.0,False,beta-lactam,ydeo
+purr,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cara
+dnaa,TF,1,0,0,1,1.0,0.0,False,beta-lactam,recn
+zrar,TF,0,1,0,1,0.0,1.0,False,aminoglycoside,acre
+lexa,TF,1,0,0,1,1.0,0.0,False,beta-lactam,recn
+rcsb,TF,1,0,0,1,1.0,0.0,False,beta-lactam,ydeo
+creb,TF,1,0,0,1,1.0,0.0,False,beta-lactam,cbrb
+cysb,TF,1,0,0,1,1.0,0.0,False,beta-lactam,dgcz
+flia,sigma,0,1,0,1,0.0,1.0,False,aminoglycoside,ykfi
+nsrr,TF,0,1,0,1,0.0,1.0,False,aminoglycoside,rybb
+small heat shock protein ibpa,TF,0,1,0,1,0.0,1.0,False,aminoglycoside,ibpb
+ryhb,TF,1,0,0,1,1.0,0.0,False,beta-lactam,sdhc
+csra,TF,1,0,0,1,1.0,0.0,False,beta-lactam,ydeo

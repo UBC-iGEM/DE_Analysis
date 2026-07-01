@@ -1,0 +1,73 @@
+════════════════════════════════════════════════════════════════════
+  REGULATORY NETWORK SCORING SUMMARY
+════════════════════════════════════════════════════════════════════
+
+Top TFs for Beta-lactam candidates (by specificity):
+  TF               spec  n_targets  cross-reactive?
+  ────────────────────────────────────────────────
+  crp             1.000          8  no
+  fis             1.000          7  no
+  arca            1.000          3  no
+  tdcr            1.000          2  no
+  mara            1.000          2  no
+
+Top TFs for Aminoglycoside candidates (by specificity):
+  TF               spec  n_targets  cross-reactive?
+  ────────────────────────────────────────────────
+  rpoe            1.000          4  no
+  ycjw            1.000          3  no
+  rcsb-bglj       1.000          2  no
+  srsr            1.000          2  no
+  leuo            1.000          1  no
+
+────────────────────────────────────────────────────────────────────
+  CANDIDATE BIOSENSOR FLAGS
+────────────────────────────────────────────────────────────────────
+
+Beta-lactam candidates (48 total):
+  gene          flag      fc  best_tf         clarity
+  ────────────────────────────────────────────────────────
+  ygey             ?    5.70                      nan
+  ygew             ✓    5.19  crp                 1.0
+  ygap             ✗    4.97  nac                0.36
+  ygex             ?    4.90                      nan
+  ygav             ✗    4.70  nac                0.36
+  alax             ⊙    4.47  fis                 0.6
+  tdcf             ⊙    4.31  crp                 0.6
+  uact             ?    4.28                      nan
+  nanc             ✓    4.22  nanr                1.0
+  ygfm             ?    3.93                      nan
+  xdhd             ?    3.89                      nan
+  dgcz             ⊙    3.75  carbon storage regulator csra      0.6
+  yqik             ?    3.65                      nan
+  hyua             ?    3.62                      nan
+  recn             ⊙    3.59  lexa                0.6
+  … and 33 more (see annotated_candidates.csv)
+
+Aminoglycoside candidates (48 total):
+  gene          flag      fc  best_tf         clarity
+  ────────────────────────────────────────────────────────
+  gfcc             ?    9.30                      nan
+  ompg             ✓    9.16  ycjw                1.0
+  ydet             ?    9.02                      nan
+  ydes             ?    8.72                      nan
+  ytfa             ?    8.41                      nan
+  rybb             ✓    8.31  dksa                1.0
+  ynba             ✓    8.03  rcsb-bglj           1.0
+  ydin             ?    8.02                      nan
+  mata             ⊙    7.80  rpoe                0.6
+  yfcv             ✗    7.66  glar                0.4
+  sfmh             ?    7.58                      nan
+  yght             ✗    7.56  nac                0.24
+  yjjq             ⊙    7.15  leuo                0.6
+  ynbb             ✓    7.10  rcsb-bglj           1.0
+  ykfi             ✓    7.06  flia                1.0
+  … and 33 more (see annotated_candidates.csv)
+
+Cross-reactive candidates (2 total):
+  gene          flag      fc  best_tf         clarity
+  ────────────────────────────────────────────────────────
+  ydfu             ?    7.21                      nan
+  yahm             ?    6.96                      nan
+
+════════════════════════════════════════════════════════════════════

@@ -1,0 +1,15 @@
+[project]
+name = "de-analysis"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.9",
+    "networkx>=3.6.1",
+    "numpy>=2.4.6",
+    "pandas>=3.0.3",
+    "pydeseq2>=0.5.4",
+    "pymodulon>=0.2.1",
+    "pyvis>=0.3.2",
+]
