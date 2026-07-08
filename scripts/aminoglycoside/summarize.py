@@ -20,8 +20,8 @@ def readable_output(df):
     return rounded
 
 
-def classify(log2fc, padj=None):
-    significant = True if padj is None or pd.isna(padj) else padj < 0.05
+def classify(log2fc, padj=None, require_padj=True):
+    significant = True if not require_padj else padj < 0.05
     if significant and log2fc > 2:
         return 'upregulated'
     if significant and log2fc < -2:
@@ -51,7 +51,7 @@ def normalize_tobramycin():
     gene_id = df.get('locus_tag', df.get('index', pd.Series(df.index, index=df.index)))
     gene = df.get('gene', df.get('Name', gene_id))
     log2fc = pd.to_numeric(df['log2FoldChange'], errors='coerce')
-    padj = pd.to_numeric(df.get('padj'), errors='coerce')
+    padj = pd.to_numeric(df.get('padj'), errors='coerce').fillna(1.0)
 
     summary = pd.DataFrame({
         'antibiotic_class': 'aminoglycoside',
@@ -64,6 +64,7 @@ def normalize_tobramycin():
         'gene_id': gene_id,
         'log2FoldChange': log2fc,
         'padj': padj,
+        'padj_source': 'input_or_set_to_1_if_missing',
         'signal_strength': [
             signal_strength(fc, adj) for fc, adj in zip(log2fc, padj)
         ],
@@ -105,12 +106,13 @@ def normalize_gentamicin():
     summary = pd.DataFrame({
         'antibiotic_class': 'aminoglycoside',
         'treatment': 'gentamicin',
-        'regulation': [classify(fc) for fc in log2fc],
+        'regulation': [classify(fc, require_padj=False) for fc in log2fc],
         'shared_group': '',
         'gene': df.get('gene', df['gene_id']),
         'gene_id': df['gene_id'],
         'log2FoldChange': log2fc,
-        'padj': np.nan,
+        'padj': 1.0,
+        'padj_source': 'not_available_no_replicates_set_to_1',
         'signal_strength': [signal_strength(fc) for fc in log2fc],
     })
     return summary.dropna(subset=['log2FoldChange'])
@@ -141,6 +143,7 @@ def shared_aminoglycoside_promoters(tobramycin, gentamicin):
         ['signal_strength_tobramycin', 'signal_strength_gentamicin']
     ].min(axis=1)
     shared['padj'] = shared['padj_tobramycin']
+    shared['padj_source'] = shared['padj_source_tobramycin']
     shared['gene_id'] = shared['gene_id_tobramycin']
     return shared
 
@@ -158,6 +161,7 @@ summary = summary.sort_values(
 leading_columns = [
     'antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene',
     'gene_id', 'log2FoldChange', 'padj', 'signal_strength',
+    'padj_source',
 ]
 summary = summary[[col for col in leading_columns if col in summary.columns] +
                   [col for col in summary.columns if col not in leading_columns]]

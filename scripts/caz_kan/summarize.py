@@ -38,7 +38,8 @@ primary_kan = pd.read_csv(require_csv('kanamycin_primary.csv'), index_col=0)
 
 
 def add_signal_columns(df):
-    df = df.dropna(subset=['gene', 'log2FoldChange', 'padj']).copy()
+    df = df.dropna(subset=['gene', 'log2FoldChange']).copy()
+    df['padj'] = pd.to_numeric(df['padj'], errors='coerce').fillna(1.0)
     safe_padj = df['padj'].clip(lower=np.finfo(float).tiny)
     df['neg_log10_padj'] = -np.log10(safe_padj)
     df['signal_strength'] = df['log2FoldChange'].abs() * df['neg_log10_padj']

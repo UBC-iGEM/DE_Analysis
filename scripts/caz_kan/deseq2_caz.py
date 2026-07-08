@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
 from pathlib import Path
@@ -33,6 +34,25 @@ def gene_names_for(index):
     return fallback
 
 
+def benjamini_hochberg(pvalues):
+    pvalues = pd.Series(pd.to_numeric(pvalues, errors='coerce')).fillna(1.0)
+    ranked = pvalues.rank(method='first').astype(int)
+    adjusted = pvalues * len(pvalues) / ranked
+    adjusted = adjusted.sort_values(ascending=False).cummin().sort_index()
+    return adjusted.clip(upper=1.0)
+
+
+def ensure_padj(results):
+    results = results.copy()
+    results['pvalue'] = pd.to_numeric(results['pvalue'], errors='coerce')
+    results['padj'] = pd.to_numeric(results['padj'], errors='coerce')
+    filled_padj = benjamini_hochberg(results['pvalue'])
+    results['padj_source'] = np.where(results['padj'].notna(), 'DESeq2', 'BH_from_pvalue')
+    results['padj'] = results['padj'].fillna(filled_padj).fillna(1.0)
+    results.loc[results['pvalue'].isna(), 'padj_source'] = 'no_valid_pvalue_set_to_1'
+    return results
+
+
 ensure_raw_dir()
 caz_files = sorted(RAW_DIR.glob('*CAZ*.txt*'))
 wu_files = sorted(RAW_DIR.glob('*Wu*.txt*'))
@@ -64,6 +84,7 @@ dds.deseq2()
 stats = DeseqStats(dds, contrast=['condition', 'ceftazidime', 'control'])
 stats.summary()
 results = stats.results_df
+results = ensure_padj(results)
 results['gene'] = gene_names_for(results.index)
 
 primary = results[(results['log2FoldChange'] > 2) & (results['padj'] < 0.05)].sort_values('log2FoldChange', ascending=False)
