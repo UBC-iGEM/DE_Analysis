@@ -10,10 +10,17 @@ antibiotics for use as biosensor components.
 data/
   aminoglycoside/
     aminoglycoside_candidates.csv   # tracked fallback input for tobramycin
+    standardized/                   # regenerated standardized import tables
+  tobramycin/
+    GSE224240_analysis.xlsx         # optional processed tobramycin input
+    standardized/
   caz_kan/
-    GSE220559_RAW.tar               # tracked raw count archive
+    GSE220559_RAW/                  # optional extracted raw count files
+    GSE220559_RAW.tar               # optional raw count archive
+    standardized/
 
 scripts/
+  standardize_inputs.py
   aminoglycoside/
     filter.py
     filter_tr_untr.py
@@ -28,12 +35,20 @@ scripts/
     interactive_plot.py
 
 outputs/
-  aminoglycoside/                   # regenerated locally, git-ignored
+  tobramycin/                       # regenerated locally, git-ignored
     final/
+    plots/
+  gentamicin/                       # generated only when gentamicin inputs exist
+    final/
+  aminoglycoside_shared/
+    final/
+  aminoglycoside/
     intermediate/
   caz_kan/                          # regenerated locally, git-ignored
     final/
-      detailed_lists/
+      ceftazidime/
+      kanamycin/
+      shared/
     intermediate/
     plots/
     scratch/
@@ -41,6 +56,36 @@ outputs/
 
 `outputs/` is intentionally ignored by git. Delete it any time you want to run
 the analysis from scratch.
+
+## Standardize Inputs
+
+Run this first after adding or extracting dataset files:
+
+```bash
+python3 scripts/standardize_inputs.py
+```
+
+This creates the same import layout for each test group:
+
+```text
+data/aminoglycoside/standardized/
+data/caz_kan/standardized/
+data/tobramycin/standardized/
+```
+
+Each standardized folder contains CSV sheets, plus one Excel workbook:
+
+```text
+counts.csv                  # sample count matrix when raw counts are available
+metadata.csv                # sample names, treatment labels, controls, replicates
+de_results.csv              # imported DE result table when already available
+standardized_inputs.xlsx    # the same sheets in one workbook
+```
+
+`caz_kan` is treated as one test group with ceftazidime, kanamycin, and water
+control samples. `tobramycin` is treated as a separate test group. The older
+`aminoglycoside` input currently contains imported candidate-level DE results,
+not raw replicate counts, so it standardizes to metadata plus `de_results.csv`.
 
 ## Dependencies
 
@@ -56,16 +101,18 @@ only want CSV summaries.
 From the repository root:
 
 ```bash
+python3 scripts/standardize_inputs.py
 python3 scripts/caz_kan/mapping.py
 python3 scripts/caz_kan/deseq2_caz.py
 python3 scripts/caz_kan/deseq2_kan.py
-python3 scripts/caz_kan/summarize.py --no-plots
+python3 scripts/caz_kan/summarize.py
 ```
 
 Main readable output:
 
 ```text
-outputs/caz_kan/final/promoter_summary.csv
+outputs/caz_kan/final/ceftazidime/promoter_summary.csv
+outputs/caz_kan/final/kanamycin/promoter_summary.csv
 ```
 
 Additional regenerated outputs include DESeq result CSVs, per-category promoter
@@ -73,34 +120,46 @@ lists, and optional volcano PNG/HTML plots:
 
 ```text
 outputs/caz_kan/intermediate/       # DESeq CSVs and mapping files
-outputs/caz_kan/final/              # one-file readable summary
-outputs/caz_kan/final/detailed_lists/
+outputs/caz_kan/final/ceftazidime/
+outputs/caz_kan/final/kanamycin/
+outputs/caz_kan/final/shared/
 outputs/caz_kan/plots/
 outputs/caz_kan/scratch/            # extracted raw archive
 ```
 
-The raw GSE220559 archive stays compressed in `data/caz_kan/GSE220559_RAW.tar`.
-The scripts extract it into `outputs/caz_kan/scratch/GSE220559_RAW/` when needed. If
-`data/caz_kan/ecoli_k12.gtf.gz` is absent, `mapping.py` writes an ID-only
-mapping so the pipeline can still run; add the GTF file for named genes.
+The CAZ/KAN scripts prefer `data/caz_kan/standardized/counts.csv` and
+`data/caz_kan/standardized/metadata.csv` when they exist. If those files are
+missing, they fall back to extracted files in `data/caz_kan/GSE220559_RAW/`, and
+then to the compressed archive in `data/caz_kan/GSE220559_RAW.tar`. If
+`data/caz_kan/ecoli_k12.gtf.gz` is absent, `mapping.py` writes an ID-only mapping
+so the pipeline can still run; add the GTF file for named genes.
 
 ## Run Aminoglycoside Summary
 
 From the repository root:
 
 ```bash
+python3 scripts/standardize_inputs.py
 python3 scripts/aminoglycoside/summarize.py
 ```
 
 Main readable output:
 
 ```text
-outputs/aminoglycoside/final/promoter_summary.csv
+outputs/tobramycin/final/promoter_summary.csv
 ```
 
-The summary uses `data/aminoglycoside/aminoglycoside_candidates.csv` as a
-fallback tobramycin input. To regenerate aminoglycoside intermediates from raw
-data, place these optional inputs in `data/aminoglycoside/`:
+The tobramycin volcano plot is saved to:
+
+```text
+outputs/aminoglycoside/plots/volcano_tobramycin.png
+outputs/tobramycin/plots/volcano_tobramycin.png
+```
+
+The summary uses `data/tobramycin/GSE224240_analysis.xlsx` when present, and
+falls back to `data/aminoglycoside/aminoglycoside_candidates.csv` otherwise. To
+regenerate aminoglycoside intermediates from raw data, place these optional
+inputs in `data/aminoglycoside/`:
 
 ```text
 GSE224240_analysis.xlsx

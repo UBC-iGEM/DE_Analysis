@@ -1,0 +1,13 @@
+sample_id,test_group,strain,treatment,condition,replicate,source_file
+EcMH1_S1,tobramycin,MG1655,control,control,1,GSE224240_analysis.xlsx
+EcMH2_S2,tobramycin,MG1655,control,control,2,GSE224240_analysis.xlsx
+EcMH3_S3,tobramycin,MG1655,control,control,3,GSE224240_analysis.xlsx
+Ectob1_S7,tobramycin,MG1655,tobramycin,treated,1,GSE224240_analysis.xlsx
+Ectob2_S8,tobramycin,MG1655,tobramycin,treated,2,GSE224240_analysis.xlsx
+Ectob3_S9,tobramycin,MG1655,tobramycin,treated,3,GSE224240_analysis.xlsx
+NCMMH1_S73,tobramycin,NCM3416,control,control,1,GSE224240_analysis.xlsx
+NCMMH2_S74,tobramycin,NCM3416,control,control,2,GSE224240_analysis.xlsx
+NCMMH3_S75,tobramycin,NCM3416,control,control,3,GSE224240_analysis.xlsx
+NCMtob1_S76,tobramycin,NCM3416,tobramycin,treated,1,GSE224240_analysis.xlsx
+NCMtob2_S77,tobramycin,NCM3416,tobramycin,treated,2,GSE224240_analysis.xlsx
+NCMtob3_S78,tobramycin,NCM3416,tobramycin,treated,3,GSE224240_analysis.xlsx

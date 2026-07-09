@@ -1,0 +1,2 @@
+sample_id,test_group,treatment,condition,replicate,source_file
+imported_candidate_results,aminoglycoside,aminoglycoside,imported_de_results_only,,aminoglycoside_candidates.csv

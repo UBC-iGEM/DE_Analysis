@@ -1,16 +1,38 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import argparse
+import os
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 DATA_DIR = REPO_ROOT / 'data' / 'aminoglycoside'
-OUTPUT_DIR = REPO_ROOT / 'outputs' / 'aminoglycoside'
-INTERMEDIATE_DIR = OUTPUT_DIR / 'intermediate'
-FINAL_DIR = OUTPUT_DIR / 'final'
+TOBRAMYCIN_DIR = REPO_ROOT / 'data' / 'tobramycin'
+OUTPUT_ROOT = REPO_ROOT / 'outputs'
+TOBRAMYCIN_OUTPUT_DIR = OUTPUT_ROOT / 'tobramycin'
+GENTAMICIN_OUTPUT_DIR = OUTPUT_ROOT / 'gentamicin'
+SHARED_OUTPUT_DIR = OUTPUT_ROOT / 'aminoglycoside_shared'
+INTERMEDIATE_DIR = OUTPUT_ROOT / 'aminoglycoside' / 'intermediate'
+TOBRAMYCIN_FINAL_DIR = TOBRAMYCIN_OUTPUT_DIR / 'final'
+TOBRAMYCIN_PLOT_DIR = TOBRAMYCIN_OUTPUT_DIR / 'plots'
+GENTAMICIN_FINAL_DIR = GENTAMICIN_OUTPUT_DIR / 'final'
+SHARED_FINAL_DIR = SHARED_OUTPUT_DIR / 'final'
+MPL_CACHE_DIR = OUTPUT_ROOT / '_cache' / 'matplotlib'
 RAW_DIR = DATA_DIR / 'GSE228373_RAW'
-SUMMARY_PATH = FINAL_DIR / 'promoter_summary.csv'
-FINAL_DIR.mkdir(parents=True, exist_ok=True)
+TOBRAMYCIN_FINAL_DIR.mkdir(parents=True, exist_ok=True)
+TOBRAMYCIN_PLOT_DIR.mkdir(parents=True, exist_ok=True)
+GENTAMICIN_FINAL_DIR.mkdir(parents=True, exist_ok=True)
+SHARED_FINAL_DIR.mkdir(parents=True, exist_ok=True)
+MPL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault('MPLCONFIGDIR', str(MPL_CACHE_DIR))
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--no-plots',
+    action='store_true',
+    help='Write promoter CSVs without generating volcano PNGs.',
+)
+args = parser.parse_args()
 
 
 def readable_output(df):
@@ -37,7 +59,7 @@ def signal_strength(log2fc, padj=None):
 
 
 def normalize_tobramycin():
-    analysis_path = DATA_DIR / 'GSE224240_analysis.xlsx'
+    analysis_path = TOBRAMYCIN_DIR / 'GSE224240_analysis.xlsx'
     candidates_path = DATA_DIR / 'aminoglycoside_candidates.csv'
 
     if analysis_path.exists():
@@ -148,24 +170,60 @@ def shared_aminoglycoside_promoters(tobramycin, gentamicin):
     return shared
 
 
+def volcano_plot(results, title, output_path):
+    import matplotlib.pyplot as plt
+
+    df = results.dropna(subset=['log2FoldChange', 'padj']).copy()
+    safe_padj = pd.to_numeric(df['padj'], errors='coerce').fillna(1.0)
+    safe_padj = safe_padj.clip(lower=np.finfo(float).tiny)
+    df['neg_log10_padj'] = -np.log10(safe_padj)
+    df['color'] = 'grey'
+    df.loc[(df['log2FoldChange'] > 2) & (df['padj'] < 0.05), 'color'] = 'red'
+    df.loc[(df['log2FoldChange'] < -2) & (df['padj'] < 0.05), 'color'] = 'blue'
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.scatter(df['log2FoldChange'], df['neg_log10_padj'], c=df['color'], alpha=0.5, s=10)
+    ax.axhline(-np.log10(0.05), color='black', linestyle='--', linewidth=0.8)
+    ax.axvline(2, color='black', linestyle='--', linewidth=0.8)
+    ax.axvline(-2, color='black', linestyle='--', linewidth=0.8)
+    ax.set_xlabel('log2 Fold Change')
+    ax.set_ylabel('-log10 adjusted p-value')
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close(fig)
+    print(f"Saved volcano plot to {output_path}")
+
+
+def write_summary(df, output_path):
+    if df.empty:
+        return
+    readable_output(df).to_csv(output_path, index=False)
+    print(f"Readable summary written to {output_path}")
+    print(f"Rows: {len(df)}")
+
+
 tobramycin = normalize_tobramycin()
 gentamicin = normalize_gentamicin()
 shared = shared_aminoglycoside_promoters(tobramycin, gentamicin)
-
-summary = pd.concat([tobramycin, gentamicin, shared], sort=False)
-summary = summary.sort_values(
-    ['shared_group', 'treatment', 'regulation', 'signal_strength'],
-    ascending=[True, True, True, False],
-)
 
 leading_columns = [
     'antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene',
     'gene_id', 'log2FoldChange', 'padj', 'signal_strength',
     'padj_source',
 ]
-summary = summary[[col for col in leading_columns if col in summary.columns] +
-                  [col for col in summary.columns if col not in leading_columns]]
-readable_output(summary).to_csv(SUMMARY_PATH, index=False)
 
-print(f"Readable aminoglycoside summary written to {SUMMARY_PATH}")
-print(f"Rows: {len(summary)}")
+for df, output_path in [
+        (tobramycin, TOBRAMYCIN_FINAL_DIR / 'promoter_summary.csv'),
+        (gentamicin, GENTAMICIN_FINAL_DIR / 'promoter_summary.csv'),
+        (shared, SHARED_FINAL_DIR / 'both_aminoglycosides_upregulated.csv')]:
+    if not df.empty:
+        df = df.sort_values(
+            ['regulation', 'signal_strength'], ascending=[True, False])
+        df = df[[col for col in leading_columns if col in df.columns] +
+                [col for col in df.columns if col not in leading_columns]]
+        write_summary(df, output_path)
+
+if not args.no_plots and not tobramycin.empty:
+    volcano_plot(tobramycin, 'Tobramycin vs Control',
+                 TOBRAMYCIN_PLOT_DIR / 'volcano_tobramycin.png')

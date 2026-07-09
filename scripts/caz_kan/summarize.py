@@ -2,17 +2,24 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import argparse
+import os
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 OUTPUT_DIR = REPO_ROOT / 'outputs' / 'caz_kan'
 INTERMEDIATE_DIR = OUTPUT_DIR / 'intermediate'
 FINAL_DIR = OUTPUT_DIR / 'final'
-DETAIL_DIR = FINAL_DIR / 'detailed_lists'
+CEFTAZIDIME_DIR = FINAL_DIR / 'ceftazidime'
+KANAMYCIN_DIR = FINAL_DIR / 'kanamycin'
+SHARED_DIR = FINAL_DIR / 'shared'
 PLOT_DIR = OUTPUT_DIR / 'plots'
-DETAIL_DIR.mkdir(parents=True, exist_ok=True)
+MPL_CACHE_DIR = REPO_ROOT / 'outputs' / '_cache' / 'matplotlib'
+CEFTAZIDIME_DIR.mkdir(parents=True, exist_ok=True)
+KANAMYCIN_DIR.mkdir(parents=True, exist_ok=True)
+SHARED_DIR.mkdir(parents=True, exist_ok=True)
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
-SUMMARY_PATH = FINAL_DIR / 'promoter_summary.csv'
+MPL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault('MPLCONFIGDIR', str(MPL_CACHE_DIR))
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -53,7 +60,7 @@ def readable_output(df):
     return rounded
 
 
-def promoter_lists(results, antibiotic_class):
+def promoter_lists(results, output_dir):
     df = add_signal_columns(results)
     upregulated = df[(df['log2FoldChange'] > 2) & (df['padj'] < 0.05)].copy()
     downregulated = df[(df['log2FoldChange'] < -2) & (df['padj'] < 0.05)].copy()
@@ -71,7 +78,7 @@ def promoter_lists(results, antibiotic_class):
 
     for regulation, data in outputs.items():
         readable_output(data).to_csv(
-            DETAIL_DIR / f'{antibiotic_class}_{regulation}_promoters.csv')
+            output_dir / f'{regulation}_promoters.csv')
 
     return outputs
 
@@ -99,23 +106,30 @@ def shared_upregulated_promoters(beta_lactam_up, aminoglycoside_up):
         ascending=[False, False, False],
     )
     readable_output(both).to_csv(
-        DETAIL_DIR / 'both_classes_upregulated_promoters.csv', index=False)
+        SHARED_DIR / 'both_classes_upregulated_promoters.csv', index=False)
     return both
 
 
-def write_combined_summary(beta_lactam_lists, aminoglycoside_lists, both_upregulated):
+def write_treatment_summary(outputs, antibiotic_class, treatment, output_path):
     rows = []
-    for antibiotic_class, treatment, outputs in [
-            ('beta_lactam', 'ceftazidime', beta_lactam_lists),
-            ('aminoglycoside', 'kanamycin', aminoglycoside_lists)]:
-        for regulation, data in outputs.items():
-            summary = data.copy()
-            summary['antibiotic_class'] = antibiotic_class
-            summary['treatment'] = treatment
-            summary['regulation'] = regulation
-            summary['shared_group'] = ''
-            rows.append(summary)
+    for regulation, data in outputs.items():
+        summary = data.copy()
+        summary['antibiotic_class'] = antibiotic_class
+        summary['treatment'] = treatment
+        summary['regulation'] = regulation
+        summary['shared_group'] = ''
+        rows.append(summary)
+    summary = pd.concat(rows, sort=False)
+    leading_columns = ['antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene']
+    ordered_columns = leading_columns + [col for col in summary.columns if col not in leading_columns]
+    summary = summary[ordered_columns]
+    readable_output(summary).to_csv(output_path, index=True, index_label='gene_id')
+    return summary
 
+
+def write_shared_summary(both_upregulated):
+    if both_upregulated.empty:
+        return
     both = both_upregulated.rename(
         columns={
             'beta_lactam_log2FoldChange': 'ceftazidime_log2FoldChange',
@@ -127,30 +141,32 @@ def write_combined_summary(beta_lactam_lists, aminoglycoside_lists, both_upregul
     both['treatment'] = 'ceftazidime_and_kanamycin'
     both['regulation'] = 'upregulated'
     both['shared_group'] = 'both_classes_upregulated'
-    rows.append(both)
-
-    summary = pd.concat(rows, sort=False)
     leading_columns = ['antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene']
-    ordered_columns = leading_columns + [col for col in summary.columns if col not in leading_columns]
-    summary = summary[ordered_columns]
-    readable_output(summary).to_csv(SUMMARY_PATH, index=True, index_label='gene_id')
-    return summary
+    ordered_columns = leading_columns + [col for col in both.columns if col not in leading_columns]
+    readable_output(both[ordered_columns]).to_csv(
+        SHARED_DIR / 'promoter_summary.csv', index=False)
 
 
-beta_lactam_lists = promoter_lists(results, 'beta_lactam')
-aminoglycoside_lists = promoter_lists(results_kan, 'aminoglycoside')
+beta_lactam_lists = promoter_lists(results, CEFTAZIDIME_DIR)
+aminoglycoside_lists = promoter_lists(results_kan, KANAMYCIN_DIR)
 both_upregulated = shared_upregulated_promoters(
     beta_lactam_lists['upregulated'], aminoglycoside_lists['upregulated'])
-combined_summary = write_combined_summary(
-    beta_lactam_lists, aminoglycoside_lists, both_upregulated)
+ceftazidime_summary = write_treatment_summary(
+    beta_lactam_lists, 'beta_lactam', 'ceftazidime',
+    CEFTAZIDIME_DIR / 'promoter_summary.csv')
+kanamycin_summary = write_treatment_summary(
+    aminoglycoside_lists, 'aminoglycoside', 'kanamycin',
+    KANAMYCIN_DIR / 'promoter_summary.csv')
+write_shared_summary(both_upregulated)
 
 # Cross-reactivity
 caz_genes = set(primary['gene'].dropna())
 kan_genes = set(primary_kan['gene'].dropna())
 overlap = caz_genes.intersection(kan_genes)
 print(f"Genes upregulated by both: {len(overlap)}")
-print(f"Detailed promoter list CSVs written to {DETAIL_DIR}")
-print(f"Combined readable summary written to {SUMMARY_PATH}")
+print(f"Ceftazidime results written to {CEFTAZIDIME_DIR}")
+print(f"Kanamycin results written to {KANAMYCIN_DIR}")
+print(f"Shared results written to {SHARED_DIR}")
 print(f"Upregulated in both classes: {len(both_upregulated)}")
 
 key_candidates = ['recA', 'recN', 'emrA', 'pspD', 'lipA', 'dgcZ']
@@ -186,7 +202,8 @@ def volcano_plot(results, title, output_path, highlight_genes=None):
     ax.set_title(title)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
-    plt.show()
+    plt.close(fig)
+    print(f"Saved volcano plot to {output_path}")
 
 if not args.no_plots:
     volcano_plot(results, 'Ceftazidime vs Control', PLOT_DIR / 'volcano_ceftazidime.png',
