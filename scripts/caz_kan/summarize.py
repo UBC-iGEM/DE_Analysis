@@ -60,6 +60,17 @@ def readable_output(df):
     return rounded
 
 
+def write_split_workbook(summary, output_dir, workbook_name='promoter_summary.xlsx'):
+    split_tables = {}
+    for regulation in ['upregulated', 'not_regulated', 'downregulated']:
+        split_tables[regulation] = summary[summary['regulation'] == regulation].copy()
+
+    with pd.ExcelWriter(output_dir / workbook_name, engine='openpyxl') as writer:
+        summary.to_excel(writer, sheet_name='all_promoters', index=False)
+        for sheet_name, split in split_tables.items():
+            split.to_excel(writer, sheet_name=sheet_name, index=False)
+
+
 def promoter_lists(results, output_dir):
     df = add_signal_columns(results)
     upregulated = df[(df['log2FoldChange'] > 2) & (df['padj'] < 0.05)].copy()
@@ -78,7 +89,7 @@ def promoter_lists(results, output_dir):
 
     for regulation, data in outputs.items():
         readable_output(data).to_csv(
-            output_dir / f'{regulation}_promoters.csv')
+            output_dir / f'{regulation}_promoters.csv', index=True, index_label='gene_id')
 
     return outputs
 
@@ -105,8 +116,6 @@ def shared_upregulated_promoters(beta_lactam_up, aminoglycoside_up):
          'aminoglycoside_log2FoldChange'],
         ascending=[False, False, False],
     )
-    readable_output(both).to_csv(
-        SHARED_DIR / 'both_classes_upregulated_promoters.csv', index=False)
     return both
 
 
@@ -120,10 +129,14 @@ def write_treatment_summary(outputs, antibiotic_class, treatment, output_path):
         summary['shared_group'] = ''
         rows.append(summary)
     summary = pd.concat(rows, sort=False)
+    summary = summary.sort_values(
+        ['signal_strength', 'log2FoldChange'], ascending=[False, False])
     leading_columns = ['antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene']
     ordered_columns = leading_columns + [col for col in summary.columns if col not in leading_columns]
     summary = summary[ordered_columns]
-    readable_output(summary).to_csv(output_path, index=True, index_label='gene_id')
+    readable_summary = readable_output(summary.reset_index(names='gene_id'))
+    readable_summary.to_csv(output_path, index=False)
+    write_split_workbook(readable_summary, output_path.parent)
     return summary
 
 
@@ -141,10 +154,21 @@ def write_shared_summary(both_upregulated):
     both['treatment'] = 'ceftazidime_and_kanamycin'
     both['regulation'] = 'upregulated'
     both['shared_group'] = 'both_classes_upregulated'
+    both = both.sort_values(
+        ['shared_signal_strength', 'ceftazidime_log2FoldChange',
+         'kanamycin_log2FoldChange'],
+        ascending=[False, False, False],
+    )
     leading_columns = ['antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene']
     ordered_columns = leading_columns + [col for col in both.columns if col not in leading_columns]
-    readable_output(both[ordered_columns]).to_csv(
-        SHARED_DIR / 'promoter_summary.csv', index=False)
+    readable_summary = readable_output(both[ordered_columns])
+    readable_summary.to_csv(SHARED_DIR / 'promoter_summary.csv', index=False)
+    readable_summary.to_csv(SHARED_DIR / 'upregulated_promoters.csv', index=False)
+    pd.DataFrame(columns=readable_summary.columns).to_csv(
+        SHARED_DIR / 'not_regulated_promoters.csv', index=False)
+    pd.DataFrame(columns=readable_summary.columns).to_csv(
+        SHARED_DIR / 'downregulated_promoters.csv', index=False)
+    write_split_workbook(readable_summary, SHARED_DIR)
 
 
 beta_lactam_lists = promoter_lists(results, CEFTAZIDIME_DIR)

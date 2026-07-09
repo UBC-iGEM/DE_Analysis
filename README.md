@@ -35,15 +35,11 @@ scripts/
     interactive_plot.py
 
 outputs/
+  aminoglycoside/                   # regenerated locally, git-ignored
+    final/
   tobramycin/                       # regenerated locally, git-ignored
     final/
     plots/
-  gentamicin/                       # generated only when gentamicin inputs exist
-    final/
-  aminoglycoside_shared/
-    final/
-  aminoglycoside/
-    intermediate/
   caz_kan/                          # regenerated locally, git-ignored
     final/
       ceftazidime/
@@ -112,11 +108,23 @@ Main readable output:
 
 ```text
 outputs/caz_kan/final/ceftazidime/promoter_summary.csv
+outputs/caz_kan/final/ceftazidime/promoter_summary.xlsx
 outputs/caz_kan/final/kanamycin/promoter_summary.csv
+outputs/caz_kan/final/kanamycin/promoter_summary.xlsx
 ```
 
-Additional regenerated outputs include DESeq result CSVs, per-category promoter
-lists, and optional volcano PNG/HTML plots:
+Each final output folder has the same readable layout:
+
+```text
+promoter_summary.csv        # all promoters sorted by signal strength
+promoter_summary.xlsx       # all_promoters, upregulated, not_regulated, downregulated sheets
+upregulated_promoters.csv
+not_regulated_promoters.csv
+downregulated_promoters.csv
+```
+
+Additional regenerated outputs include DESeq result CSVs and optional volcano
+PNG/HTML plots:
 
 ```text
 outputs/caz_kan/intermediate/       # DESeq CSVs and mapping files
@@ -146,36 +154,31 @@ python3 scripts/aminoglycoside/summarize.py
 Main readable output:
 
 ```text
+outputs/aminoglycoside/final/promoter_summary.csv
+outputs/aminoglycoside/final/promoter_summary.xlsx
 outputs/tobramycin/final/promoter_summary.csv
+outputs/tobramycin/final/promoter_summary.xlsx
+```
+
+Each final output folder has the same readable layout:
+
+```text
+promoter_summary.csv        # all promoters sorted by signal strength
+promoter_summary.xlsx       # all_promoters, upregulated, not_regulated, downregulated sheets
+upregulated_promoters.csv
+not_regulated_promoters.csv
+downregulated_promoters.csv
 ```
 
 The tobramycin volcano plot is saved to:
 
 ```text
-outputs/aminoglycoside/plots/volcano_tobramycin.png
 outputs/tobramycin/plots/volcano_tobramycin.png
 ```
 
-The summary uses `data/tobramycin/GSE224240_analysis.xlsx` when present, and
-falls back to `data/aminoglycoside/aminoglycoside_candidates.csv` otherwise. To
-regenerate aminoglycoside intermediates from raw data, place these optional
-inputs in `data/aminoglycoside/`:
-
-```text
-GSE224240_analysis.xlsx
-GSE228373_RAW/
-ecoli_annotation.gtf
-```
-
-Then run:
-
-```bash
-python3 scripts/aminoglycoside/filter.py
-python3 scripts/aminoglycoside/filter_tr_untr.py
-python3 scripts/aminoglycoside/mapping.py
-python3 scripts/aminoglycoside/compare.py
-python3 scripts/aminoglycoside/summarize.py
-```
+The summary uses `data/tobramycin/GSE224240_analysis.xlsx` for tobramycin and
+`data/aminoglycoside/standardized/de_results.csv` for the imported
+aminoglycoside candidate set.
 
 ## Output Conventions
 
