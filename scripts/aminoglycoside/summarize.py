@@ -1,16 +1,33 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import argparse
+import os
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 DATA_DIR = REPO_ROOT / 'data' / 'aminoglycoside'
-OUTPUT_DIR = REPO_ROOT / 'outputs' / 'aminoglycoside'
-INTERMEDIATE_DIR = OUTPUT_DIR / 'intermediate'
-FINAL_DIR = OUTPUT_DIR / 'final'
-RAW_DIR = DATA_DIR / 'GSE228373_RAW'
-SUMMARY_PATH = FINAL_DIR / 'promoter_summary.csv'
-FINAL_DIR.mkdir(parents=True, exist_ok=True)
+TOBRAMYCIN_DIR = REPO_ROOT / 'data' / 'tobramycin'
+OUTPUT_ROOT = REPO_ROOT / 'outputs'
+AMINOGLYCOSIDE_OUTPUT_DIR = OUTPUT_ROOT / 'aminoglycoside'
+TOBRAMYCIN_OUTPUT_DIR = OUTPUT_ROOT / 'tobramycin'
+AMINOGLYCOSIDE_FINAL_DIR = AMINOGLYCOSIDE_OUTPUT_DIR / 'final'
+TOBRAMYCIN_FINAL_DIR = TOBRAMYCIN_OUTPUT_DIR / 'final'
+TOBRAMYCIN_PLOT_DIR = TOBRAMYCIN_OUTPUT_DIR / 'plots'
+MPL_CACHE_DIR = OUTPUT_ROOT / '_cache' / 'matplotlib'
+AMINOGLYCOSIDE_FINAL_DIR.mkdir(parents=True, exist_ok=True)
+TOBRAMYCIN_FINAL_DIR.mkdir(parents=True, exist_ok=True)
+TOBRAMYCIN_PLOT_DIR.mkdir(parents=True, exist_ok=True)
+MPL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault('MPLCONFIGDIR', str(MPL_CACHE_DIR))
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--no-plots',
+    action='store_true',
+    help='Write promoter CSVs without generating volcano PNGs.',
+)
+args = parser.parse_args()
 
 
 def readable_output(df):
@@ -20,8 +37,8 @@ def readable_output(df):
     return rounded
 
 
-def classify(log2fc, padj=None):
-    significant = True if padj is None or pd.isna(padj) else padj < 0.05
+def classify(log2fc, padj=None, require_padj=True):
+    significant = True if not require_padj else padj < 0.05
     if significant and log2fc > 2:
         return 'upregulated'
     if significant and log2fc < -2:
@@ -36,8 +53,44 @@ def signal_strength(log2fc, padj=None):
     return abs(log2fc) * -np.log10(safe_padj)
 
 
+def normalize_imported_aminoglycoside():
+    standardized_path = DATA_DIR / 'standardized' / 'de_results.csv'
+    candidates_path = DATA_DIR / 'aminoglycoside_candidates.csv'
+
+    if standardized_path.exists():
+        df = pd.read_csv(standardized_path)
+    elif candidates_path.exists():
+        df = pd.read_csv(candidates_path)
+    else:
+        print('No imported aminoglycoside input found; skipping aminoglycoside summary')
+        return pd.DataFrame()
+
+    gene_id = df.get('gene_id', df.get('locus_tag', df.get('index', pd.Series(df.index, index=df.index))))
+    gene = df.get('gene', df.get('Name', gene_id))
+    log2fc = pd.to_numeric(df['log2FoldChange'], errors='coerce')
+    padj = pd.to_numeric(df.get('padj'), errors='coerce').fillna(1.0)
+
+    summary = pd.DataFrame({
+        'antibiotic_class': 'aminoglycoside',
+        'treatment': 'imported_aminoglycoside',
+        'regulation': [
+            classify(fc, adj) for fc, adj in zip(log2fc, padj)
+        ],
+        'shared_group': '',
+        'gene': gene,
+        'gene_id': gene_id,
+        'log2FoldChange': log2fc,
+        'padj': padj,
+        'padj_source': 'input_or_set_to_1_if_missing',
+        'signal_strength': [
+            signal_strength(fc, adj) for fc, adj in zip(log2fc, padj)
+        ],
+    })
+    return summary.dropna(subset=['log2FoldChange'])
+
+
 def normalize_tobramycin():
-    analysis_path = DATA_DIR / 'GSE224240_analysis.xlsx'
+    analysis_path = TOBRAMYCIN_DIR / 'GSE224240_analysis.xlsx'
     candidates_path = DATA_DIR / 'aminoglycoside_candidates.csv'
 
     if analysis_path.exists():
@@ -51,7 +104,7 @@ def normalize_tobramycin():
     gene_id = df.get('locus_tag', df.get('index', pd.Series(df.index, index=df.index)))
     gene = df.get('gene', df.get('Name', gene_id))
     log2fc = pd.to_numeric(df['log2FoldChange'], errors='coerce')
-    padj = pd.to_numeric(df.get('padj'), errors='coerce')
+    padj = pd.to_numeric(df.get('padj'), errors='coerce').fillna(1.0)
 
     summary = pd.DataFrame({
         'antibiotic_class': 'aminoglycoside',
@@ -64,6 +117,7 @@ def normalize_tobramycin():
         'gene_id': gene_id,
         'log2FoldChange': log2fc,
         'padj': padj,
+        'padj_source': 'input_or_set_to_1_if_missing',
         'signal_strength': [
             signal_strength(fc, adj) for fc, adj in zip(log2fc, padj)
         ],
@@ -71,97 +125,72 @@ def normalize_tobramycin():
     return summary.dropna(subset=['log2FoldChange'])
 
 
-def normalize_gentamicin():
-    treated_path = RAW_DIR / 'GSM7119829_476822_S10.txt'
-    untreated_path = RAW_DIR / 'GSM7119827_385274_DKP.txt'
-    named_candidates_path = INTERMEDIATE_DIR / 'gentamicin_candidates_named.csv'
-    candidates_path = INTERMEDIATE_DIR / 'gentamicin_candidates.csv'
+def volcano_plot(results, title, output_path):
+    import matplotlib.pyplot as plt
 
-    if treated_path.exists() and untreated_path.exists():
-        treated = pd.read_csv(treated_path, sep='\t', names=['gene_id', 'treated'])
-        untreated = pd.read_csv(untreated_path, sep='\t', names=['gene_id', 'untreated'])
-        df = treated.merge(untreated, on='gene_id')
-        df['treated'] = pd.to_numeric(df['treated'], errors='coerce')
-        df['untreated'] = pd.to_numeric(df['untreated'], errors='coerce')
-        df['log2FoldChange'] = np.log2((df['treated'] + 1) / (df['untreated'] + 1))
-        df['gene'] = df['gene_id']
+    df = results.dropna(subset=['log2FoldChange', 'padj']).copy()
+    safe_padj = pd.to_numeric(df['padj'], errors='coerce').fillna(1.0)
+    safe_padj = safe_padj.clip(lower=np.finfo(float).tiny)
+    df['neg_log10_padj'] = -np.log10(safe_padj)
+    df['color'] = 'grey'
+    df.loc[(df['log2FoldChange'] > 2) & (df['padj'] < 0.05), 'color'] = 'red'
+    df.loc[(df['log2FoldChange'] < -2) & (df['padj'] < 0.05), 'color'] = 'blue'
 
-        if named_candidates_path.exists():
-            names = pd.read_csv(named_candidates_path)[['gene_id', 'gene']].dropna()
-            df = df.drop(columns=['gene']).merge(names, on='gene_id', how='left')
-            df['gene'] = df['gene'].fillna(df['gene_id'])
-    elif named_candidates_path.exists():
-        df = pd.read_csv(named_candidates_path)
-        df['log2FoldChange'] = pd.to_numeric(df['log2FC'], errors='coerce')
-    elif candidates_path.exists():
-        df = pd.read_csv(candidates_path)
-        df['gene'] = df['gene_id']
-        df['log2FoldChange'] = pd.to_numeric(df['log2FC'], errors='coerce')
-    else:
-        print('No gentamicin input found; skipping gentamicin summary')
-        return pd.DataFrame()
-
-    log2fc = pd.to_numeric(df['log2FoldChange'], errors='coerce')
-    summary = pd.DataFrame({
-        'antibiotic_class': 'aminoglycoside',
-        'treatment': 'gentamicin',
-        'regulation': [classify(fc) for fc in log2fc],
-        'shared_group': '',
-        'gene': df.get('gene', df['gene_id']),
-        'gene_id': df['gene_id'],
-        'log2FoldChange': log2fc,
-        'padj': np.nan,
-        'signal_strength': [signal_strength(fc) for fc in log2fc],
-    })
-    return summary.dropna(subset=['log2FoldChange'])
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.scatter(df['log2FoldChange'], df['neg_log10_padj'], c=df['color'], alpha=0.5, s=10)
+    ax.axhline(-np.log10(0.05), color='black', linestyle='--', linewidth=0.8)
+    ax.axvline(2, color='black', linestyle='--', linewidth=0.8)
+    ax.axvline(-2, color='black', linestyle='--', linewidth=0.8)
+    ax.set_xlabel('log2 Fold Change')
+    ax.set_ylabel('-log10 adjusted p-value')
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close(fig)
+    print(f"Saved volcano plot to {output_path}")
 
 
-def shared_aminoglycoside_promoters(tobramycin, gentamicin):
-    if tobramycin.empty or gentamicin.empty:
-        return pd.DataFrame()
-
-    tob_up = tobramycin[tobramycin['regulation'] == 'upregulated']
-    gen_up = gentamicin[gentamicin['regulation'] == 'upregulated']
-    shared = tob_up.merge(
-        gen_up,
-        on='gene',
-        suffixes=('_tobramycin', '_gentamicin'),
-    )
-    if shared.empty:
-        return shared
-
-    shared['antibiotic_class'] = 'aminoglycoside'
-    shared['treatment'] = 'tobramycin_and_gentamicin'
-    shared['regulation'] = 'upregulated'
-    shared['shared_group'] = 'both_aminoglycosides_upregulated'
-    shared['log2FoldChange'] = shared[
-        ['log2FoldChange_tobramycin', 'log2FoldChange_gentamicin']
-    ].min(axis=1)
-    shared['signal_strength'] = shared[
-        ['signal_strength_tobramycin', 'signal_strength_gentamicin']
-    ].min(axis=1)
-    shared['padj'] = shared['padj_tobramycin']
-    shared['gene_id'] = shared['gene_id_tobramycin']
-    return shared
+def ordered_summary(df):
+    if df.empty:
+        return df
+    df = df.sort_values(
+        ['signal_strength', 'log2FoldChange'], ascending=[False, False])
+    leading_columns = [
+        'antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene',
+        'gene_id', 'log2FoldChange', 'padj', 'signal_strength',
+        'padj_source',
+    ]
+    return df[[col for col in leading_columns if col in df.columns] +
+              [col for col in df.columns if col not in leading_columns]]
 
 
+def write_dataset_outputs(df, output_dir):
+    if df.empty:
+        return
+    summary = readable_output(ordered_summary(df))
+    summary.to_csv(output_dir / 'promoter_summary.csv', index=False)
+
+    split_tables = {}
+    for regulation in ['upregulated', 'not_regulated', 'downregulated']:
+        split = summary[summary['regulation'] == regulation].copy()
+        split_tables[regulation] = split
+        split.to_csv(output_dir / f'{regulation}_promoters.csv', index=False)
+
+    with pd.ExcelWriter(output_dir / 'promoter_summary.xlsx', engine='openpyxl') as writer:
+        summary.to_excel(writer, sheet_name='all_promoters', index=False)
+        for sheet_name, split in split_tables.items():
+            split.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    print(f"Readable summary written to {output_dir}")
+    print(f"Rows: {len(summary)}")
+
+
+imported_aminoglycoside = normalize_imported_aminoglycoside()
 tobramycin = normalize_tobramycin()
-gentamicin = normalize_gentamicin()
-shared = shared_aminoglycoside_promoters(tobramycin, gentamicin)
 
-summary = pd.concat([tobramycin, gentamicin, shared], sort=False)
-summary = summary.sort_values(
-    ['shared_group', 'treatment', 'regulation', 'signal_strength'],
-    ascending=[True, True, True, False],
-)
+write_dataset_outputs(imported_aminoglycoside, AMINOGLYCOSIDE_FINAL_DIR)
+write_dataset_outputs(tobramycin, TOBRAMYCIN_FINAL_DIR)
 
-leading_columns = [
-    'antibiotic_class', 'treatment', 'regulation', 'shared_group', 'gene',
-    'gene_id', 'log2FoldChange', 'padj', 'signal_strength',
-]
-summary = summary[[col for col in leading_columns if col in summary.columns] +
-                  [col for col in summary.columns if col not in leading_columns]]
-readable_output(summary).to_csv(SUMMARY_PATH, index=False)
-
-print(f"Readable aminoglycoside summary written to {SUMMARY_PATH}")
-print(f"Rows: {len(summary)}")
+if not args.no_plots and not tobramycin.empty:
+    volcano_plot(tobramycin, 'Tobramycin vs Control',
+                 TOBRAMYCIN_PLOT_DIR / 'volcano_tobramycin.png')
