@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+WT_1,amoxicillin,beta_lactam,amoxicillin,WT,control,1,GSM1147038_WT1_processed.txt.gz
+WT_2,amoxicillin,beta_lactam,amoxicillin,WT,control,2,GSM1147039_WT2_processed.txt.gz
+WT_3,amoxicillin,beta_lactam,amoxicillin,WT,control,3,GSM1147040_WT3_processed.txt.gz
+WT_amox_1,amoxicillin,beta_lactam,amoxicillin,WT_amox,treated,1,GSM1147041_WTamox1_processed.txt.gz
+WT_amox_2,amoxicillin,beta_lactam,amoxicillin,WT_amox,treated,2,GSM1147042_WTamox2_processed.txt.gz
+WT_amox_3,amoxicillin,beta_lactam,amoxicillin,WT_amox,treated,3,GSM1147043_WTamox3_processed.txt.gz
