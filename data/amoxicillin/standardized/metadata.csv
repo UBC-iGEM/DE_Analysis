@@ -1,0 +1,6 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+FPKM of control-1,amoxicillin,beta_lactam,amoxicillin_resistant_mutant,control,control,FPKM of control-1,GSE108190_antibiotics_resistant_mutants.txt.gz
+FPKM of control-2,amoxicillin,beta_lactam,amoxicillin_resistant_mutant,control,control,FPKM of control-2,GSE108190_antibiotics_resistant_mutants.txt.gz
+FPKM of control-3,amoxicillin,beta_lactam,amoxicillin_resistant_mutant,control,control,FPKM of control-3,GSE108190_antibiotics_resistant_mutants.txt.gz
+FPKM of Flu30d-Amor-1,amoxicillin,beta_lactam,amoxicillin_resistant_mutant,Flu30d-Amor,treated,FPKM of Flu30d-Amor-1,GSE108190_antibiotics_resistant_mutants.txt.gz
+FPKM of Flu30d-Amor-2,amoxicillin,beta_lactam,amoxicillin_resistant_mutant,Flu30d-Amor,treated,FPKM of Flu30d-Amor-2,GSE108190_antibiotics_resistant_mutants.txt.gz

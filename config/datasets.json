@@ -1,0 +1,96 @@
+{
+  "thresholds": {
+    "log2_fold_change": 2.0,
+    "padj": 0.05
+  },
+  "datasets": [
+    {
+      "name": "amoxicillin",
+      "antibiotic_class": "beta_lactam",
+      "treatment": "amoxicillin_resistant_mutant",
+      "comparison": "fluoxetine_30d_amoxicillin_resistant_mutant_vs_control",
+      "input_type": "fpkm_matrix",
+      "expression_matrix": "data/amoxicillin/GSE108190_antibiotics_resistant_mutants.txt.gz",
+      "separator": "\t",
+      "encoding": "latin1",
+      "control_samples": [
+        "FPKM of control-1",
+        "FPKM of control-2",
+        "FPKM of control-3"
+      ],
+      "treated_samples": [
+        "FPKM of Flu30d-Amor-1",
+        "FPKM of Flu30d-Amor-2"
+      ],
+      "sample_groups": {
+        "FPKM of control-1": "control",
+        "FPKM of control-2": "control",
+        "FPKM of control-3": "control",
+        "FPKM of Flu30d-Amor-1": "Flu30d-Amor",
+        "FPKM of Flu30d-Amor-2": "Flu30d-Amor"
+      },
+      "gene_id_column": "Gene",
+      "gene_column": "Gene",
+      "annotation_columns": [
+        "Product",
+        "Note",
+        "Locus",
+        "Protein ID",
+        "COG Class",
+        "COG Annotation",
+        "GeneID",
+        "Protein product",
+        "Protein Length",
+        "Protein name"
+      ],
+      "sample_aggregation": "mean",
+      "value_scale": "linear"
+    },
+    {
+      "name": "ceftazidime",
+      "antibiotic_class": "beta_lactam",
+      "treatment": "ceftazidime",
+      "comparison": "ceftazidime_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/ceftazidime/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>CAZ|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": ["Wu"],
+      "treated_groups": ["CAZ"],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount"
+    },
+    {
+      "name": "gentamicin",
+      "antibiotic_class": "aminoglycoside",
+      "treatment": "gentamicin",
+      "input_type": "series_matrix",
+      "series_matrix": "data/gentamicin/GSE44211_series_matrix.txt.gz",
+      "platform_annotation": "data/gentamicin/GPL3154.annot.gz",
+      "raw_archive": "data/gentamicin/GSE44211_RAW.tar",
+      "control_samples": ["GSM1080843", "GSM1080844", "GSM1080845"],
+      "treated_samples": ["GSM1080849", "GSM1080850", "GSM1080851"],
+      "sample_labels": {
+        "GSM1080843": "Control-1",
+        "GSM1080844": "Control-2",
+        "GSM1080845": "Control-3",
+        "GSM1080849": "Gentamicin-1",
+        "GSM1080850": "Gentamicin-2",
+        "GSM1080851": "Gentamicin-3"
+      },
+      "value_scale": "linear"
+    },
+    {
+      "name": "tobramycin",
+      "antibiotic_class": "aminoglycoside",
+      "treatment": "tobramycin",
+      "input_type": "excel_de_results",
+      "workbook": "data/tobramycin/GSE224240_analysis.xlsx",
+      "de_sheet": "MH vs tob",
+      "counts_sheet": "counts",
+      "comparison": "MG1655_tobramycin_vs_control",
+      "gene_id_column": "locus_tag",
+      "gene_column": "gene"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+GSM1080843,gentamicin,aminoglycoside,gentamicin,Control-1,control,1,GSE44211_series_matrix.txt.gz
+GSM1080844,gentamicin,aminoglycoside,gentamicin,Control-2,control,2,GSE44211_series_matrix.txt.gz
+GSM1080845,gentamicin,aminoglycoside,gentamicin,Control-3,control,3,GSE44211_series_matrix.txt.gz
+GSM1080849,gentamicin,aminoglycoside,gentamicin,Gentamicin-1,treated,1,GSE44211_series_matrix.txt.gz
+GSM1080850,gentamicin,aminoglycoside,gentamicin,Gentamicin-2,treated,2,GSE44211_series_matrix.txt.gz
+GSM1080851,gentamicin,aminoglycoside,gentamicin,Gentamicin-3,treated,3,GSE44211_series_matrix.txt.gz

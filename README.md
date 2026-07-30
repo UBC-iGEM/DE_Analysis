@@ -1,192 +1,154 @@
 # Promoter Selection Differential Expression Analysis
 
 ## Goal
-Identify E. coli promoters activated by aminoglycoside and beta-lactam
-antibiotics for use as biosensor components.
 
-## Directory Structure
+Identify E. coli promoters that respond to antibiotic exposure and rank them for
+biosensor design.
+
+## Current Datasets
 
 ```text
 data/
-  aminoglycoside/
-    aminoglycoside_candidates.csv   # tracked fallback input for tobramycin
-    standardized/                   # regenerated standardized import tables
+  amoxicillin/
+    GSE108190_antibiotics_resistant_mutants.txt.gz
+    standardized/
+  gentamicin/
+    GSE44211_RAW.tar
+    GSE44211_series_matrix.txt.gz
+    GPL3154.annot.gz
+    standardized/
   tobramycin/
-    GSE224240_analysis.xlsx         # optional processed tobramycin input
+    GSE224240_analysis.xlsx
     standardized/
-  caz_kan/
-    GSE220559_RAW/                  # optional extracted raw count files
-    GSE220559_RAW.tar               # optional raw count archive
-    standardized/
+
+config/
+  datasets.json
 
 scripts/
-  standardize_inputs.py
-  aminoglycoside/
-    filter.py
-    filter_tr_untr.py
-    mapping.py
-    compare.py
-    summarize.py
-  caz_kan/
-    mapping.py
-    deseq2_caz.py
-    deseq2_kan.py
-    summarize.py
-    interactive_plot.py
+  run_analysis.py
 
 outputs/
-  aminoglycoside/                   # regenerated locally, git-ignored
-    final/
-  tobramycin/                       # regenerated locally, git-ignored
-    final/
-    plots/
-  caz_kan/                          # regenerated locally, git-ignored
-    final/
-      ceftazidime/
-      kanamycin/
-      shared/
-    intermediate/
-    plots/
-    scratch/
+  amoxicillin/
+  gentamicin/
+  tobramycin/
 ```
 
-`outputs/` is intentionally ignored by git. Delete it any time you want to run
+`outputs/` is ignored by git and can be deleted whenever you want to regenerate
 the analysis from scratch.
 
-## Standardize Inputs
+## Run Everything
 
-Run this first after adding or extracting dataset files:
-
-```bash
-python3 scripts/standardize_inputs.py
-```
-
-This creates the same import layout for each test group:
-
-```text
-data/aminoglycoside/standardized/
-data/caz_kan/standardized/
-data/tobramycin/standardized/
-```
-
-Each standardized folder contains CSV sheets, plus one Excel workbook:
-
-```text
-counts.csv                  # sample count matrix when raw counts are available
-metadata.csv                # sample names, treatment labels, controls, replicates
-de_results.csv              # imported DE result table when already available
-standardized_inputs.xlsx    # the same sheets in one workbook
-```
-
-`caz_kan` is treated as one test group with ceftazidime, kanamycin, and water
-control samples. `tobramycin` is treated as a separate test group. The older
-`aminoglycoside` input currently contains imported candidate-level DE results,
-not raw replicate counts, so it standardizes to metadata plus `de_results.csv`.
-
-## Dependencies
+Install dependencies:
 
 ```bash
-python3 -m pip install pandas numpy pydeseq2 matplotlib plotly openpyxl
+python3 -m pip install pandas numpy scipy matplotlib plotly openpyxl
 ```
-
-`matplotlib` and `plotly` are only needed for plots. Use `--no-plots` when you
-only want CSV summaries.
-
-## Run CAZ/KAN Analysis
 
 From the repository root:
 
 ```bash
-python3 scripts/standardize_inputs.py
-python3 scripts/caz_kan/mapping.py
-python3 scripts/caz_kan/deseq2_caz.py
-python3 scripts/caz_kan/deseq2_kan.py
-python3 scripts/caz_kan/summarize.py
+python3 scripts/run_analysis.py
 ```
 
-Main readable output:
-
-```text
-outputs/caz_kan/final/ceftazidime/promoter_summary.csv
-outputs/caz_kan/final/ceftazidime/promoter_summary.xlsx
-outputs/caz_kan/final/kanamycin/promoter_summary.csv
-outputs/caz_kan/final/kanamycin/promoter_summary.xlsx
-```
-
-Each final output folder has the same readable layout:
-
-```text
-promoter_summary.csv        # all promoters sorted by signal strength
-promoter_summary.xlsx       # all_promoters, upregulated, not_regulated, downregulated sheets
-upregulated_promoters.csv
-not_regulated_promoters.csv
-downregulated_promoters.csv
-```
-
-Additional regenerated outputs include DESeq result CSVs and optional volcano
-PNG/HTML plots:
-
-```text
-outputs/caz_kan/intermediate/       # DESeq CSVs and mapping files
-outputs/caz_kan/final/ceftazidime/
-outputs/caz_kan/final/kanamycin/
-outputs/caz_kan/final/shared/
-outputs/caz_kan/plots/
-outputs/caz_kan/scratch/            # extracted raw archive
-```
-
-The CAZ/KAN scripts prefer `data/caz_kan/standardized/counts.csv` and
-`data/caz_kan/standardized/metadata.csv` when they exist. If those files are
-missing, they fall back to extracted files in `data/caz_kan/GSE220559_RAW/`, and
-then to the compressed archive in `data/caz_kan/GSE220559_RAW.tar`. If
-`data/caz_kan/ecoli_k12.gtf.gz` is absent, `mapping.py` writes an ID-only mapping
-so the pipeline can still run; add the GTF file for named genes.
-
-## Run Aminoglycoside Summary
-
-From the repository root:
+Run one dataset only:
 
 ```bash
-python3 scripts/standardize_inputs.py
-python3 scripts/aminoglycoside/summarize.py
+python3 scripts/run_analysis.py --dataset gentamicin
 ```
 
-Main readable output:
+Skip volcano plots:
+
+```bash
+python3 scripts/run_analysis.py --no-plots
+```
+
+## Change Antibiotic Classes Or Comparisons
+
+Edit:
 
 ```text
-outputs/aminoglycoside/final/promoter_summary.csv
-outputs/aminoglycoside/final/promoter_summary.xlsx
-outputs/tobramycin/final/promoter_summary.csv
-outputs/tobramycin/final/promoter_summary.xlsx
+config/datasets.json
 ```
 
-Each final output folder has the same readable layout:
+The key parameters are:
 
 ```text
-promoter_summary.csv        # all promoters sorted by signal strength
-promoter_summary.xlsx       # all_promoters, upregulated, not_regulated, downregulated sheets
-upregulated_promoters.csv
-not_regulated_promoters.csv
-downregulated_promoters.csv
+name                    # dataset/output folder name
+antibiotic_class        # e.g. aminoglycoside, beta_lactam
+treatment               # antibiotic name
+input_type              # fpkm_matrix, series_matrix, excel_de_results
+count_matrix            # read-count CSV for read_counts_csv datasets
+expression_matrix       # FPKM matrix for fpkm_matrix datasets
+control_groups/samples  # controls
+treated_groups/samples  # antibiotic-treated samples
+value_scale             # log2 or linear
 ```
 
-The tobramycin volcano plot is saved to:
+This lets you add or swap datasets without writing a new script for every
+antibiotic.
+
+## Outputs
+
+Each dataset gets the same final structure:
 
 ```text
-outputs/tobramycin/plots/volcano_tobramycin.png
+outputs/<dataset>/final/
+  promoter_summary.csv
+  promoter_summary.xlsx
+  upregulated_promoters.csv
+  not_regulated_promoters.csv
+  downregulated_promoters.csv
+
+outputs/<dataset>/plots/
+  volcano_<dataset>.png
+  volcano_<dataset>.html
 ```
 
-The summary uses `data/tobramycin/GSE224240_analysis.xlsx` for tobramycin and
-`data/aminoglycoside/standardized/de_results.csv` for the imported
-aminoglycoside candidate set.
+Each Excel workbook has four sheets:
 
-## Output Conventions
+```text
+all_promoters
+upregulated
+not_regulated
+downregulated
+```
 
-Promoter summaries classify rows as:
+All promoter summaries are sorted by highest `signal_strength` first. Numeric
+outputs are rounded to two decimal places.
 
-- `upregulated`: `log2FoldChange > 2` and, where available, `padj < 0.05`
-- `downregulated`: `log2FoldChange < -2` and, where available, `padj < 0.05`
-- `not_regulated`: all other rows
+## Output Columns
 
-Readable summary CSVs round numeric values to two decimal places and sort by
-signal strength.
+Important columns:
+
+```text
+gene
+gene_id
+log2FoldChange
+pvalue
+padj
+signal_strength
+regulation
+```
+
+`regulation` is assigned with:
+
+```text
+upregulated    log2FoldChange > 2 and padj < 0.05
+downregulated  log2FoldChange < -2 and padj < 0.05
+not_regulated  everything else
+```
+
+`signal_strength` is:
+
+```text
+abs(log2FoldChange) * -log10(padj)
+```
+
+This ranks promoters by both effect size and statistical confidence.
+
+## Notes
+
+Amoxicillin and gentamicin are microarray datasets, so the pipeline uses
+replicate expression values with Welch t-tests and Benjamini-Hochberg adjusted
+p-values. Tobramycin already includes a processed DE result sheet, so the
+pipeline standardizes and summarizes that existing result.
