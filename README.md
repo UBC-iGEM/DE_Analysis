@@ -12,6 +12,9 @@ data/
   amoxicillin/
     GSE108190_antibiotics_resistant_mutants.txt.gz
     standardized/
+  ceftazidime/
+    GSE220559_RAW.tar
+    standardized/
   gentamicin/
     GSE44211_RAW.tar
     GSE44211_series_matrix.txt.gz
@@ -29,6 +32,7 @@ scripts/
 
 outputs/
   amoxicillin/
+  ceftazidime/
   gentamicin/
   tobramycin/
 ```
@@ -41,7 +45,7 @@ the analysis from scratch.
 Install dependencies:
 
 ```bash
-python3 -m pip install pandas numpy scipy matplotlib plotly openpyxl
+python3 -m pip install -r requirements.txt
 ```
 
 From the repository root:
@@ -77,8 +81,10 @@ name                    # dataset/output folder name
 antibiotic_class        # e.g. aminoglycoside, beta_lactam
 treatment               # antibiotic name
 input_type              # fpkm_matrix, series_matrix, excel_de_results
+                        # tar_gene_tables, expression_matrix, read_counts_csv
 count_matrix            # read-count CSV for read_counts_csv datasets
 expression_matrix       # FPKM matrix for fpkm_matrix datasets
+archive                 # tar archive for tar_gene_tables datasets
 control_groups/samples  # controls
 treated_groups/samples  # antibiotic-treated samples
 value_scale             # log2 or linear
@@ -148,7 +154,23 @@ This ranks promoters by both effect size and statistical confidence.
 
 ## Notes
 
-Amoxicillin and gentamicin are microarray datasets, so the pipeline uses
-replicate expression values with Welch t-tests and Benjamini-Hochberg adjusted
-p-values. Tobramycin already includes a processed DE result sheet, so the
-pipeline standardizes and summarizes that existing result.
+The current analysis includes four antibiotic datasets:
+
+```text
+amoxicillin   beta-lactam       GSE108190
+ceftazidime   beta-lactam       GSE220559
+gentamicin    aminoglycoside    GSE44211
+tobramycin    aminoglycoside    GSE224240
+```
+
+Amoxicillin uses a processed FPKM matrix from fluoxetine-induced
+amoxicillin-resistant mutants, so it should be interpreted as a resistance-state
+comparison rather than a direct acute amoxicillin exposure. Ceftazidime uses raw
+per-sample read-count tables from a tar archive. Gentamicin uses replicate
+microarray expression values. Tobramycin already includes a processed
+differential expression result sheet, so the pipeline standardizes and summarizes
+that existing result.
+
+For datasets without an input adjusted p-value, the pipeline uses Welch t-tests
+across replicate expression/count values and Benjamini-Hochberg adjusted
+p-values.
