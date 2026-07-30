@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+CAZ_2,ceftazidime,beta_lactam,ceftazidime,CAZ,treated,2,GSM6806863_CAZ_2.txt.gz
+CAZ_3,ceftazidime,beta_lactam,ceftazidime,CAZ,treated,3,GSM6806864_CAZ_3.txt.gz
+CAZ_4,ceftazidime,beta_lactam,ceftazidime,CAZ,treated,4,GSM6806865_CAZ_4.txt.gz
+Wu_2,ceftazidime,beta_lactam,ceftazidime,Wu,control,2,GSM6806890_Wu_2.txt.gz
+Wu_3,ceftazidime,beta_lactam,ceftazidime,Wu,control,3,GSM6806891_Wu_3.txt.gz
+Wu_4,ceftazidime,beta_lactam,ceftazidime,Wu,control,4,GSM6806892_Wu_4.txt.gz

@@ -44,10 +44,11 @@ def repo_path(path):
 
 def benjamini_hochberg(pvalues):
     pvalues = pd.Series(pd.to_numeric(pvalues, errors="coerce")).fillna(1.0)
-    ranked = pvalues.rank(method="first").astype(int)
-    adjusted = pvalues * len(pvalues) / ranked
-    adjusted = adjusted.sort_values(ascending=False).cummin().sort_index()
-    return adjusted.clip(upper=1.0)
+    ordered = pvalues.sort_values(kind="mergesort")
+    ranks = np.arange(1, len(ordered) + 1)
+    adjusted = ordered * len(ordered) / ranks
+    adjusted = adjusted.iloc[::-1].cummin().iloc[::-1]
+    return adjusted.reindex(pvalues.index).clip(upper=1.0)
 
 
 def signal_strength(log2fc, padj):
@@ -186,6 +187,75 @@ def expression_de(expression, metadata, dataset):
     return results
 
 
+def median_ratio_size_factors(counts):
+    counts = counts.apply(pd.to_numeric, errors="coerce").fillna(0.0)
+    positive = counts.where(counts > 0)
+    log_geomeans = np.log(positive).mean(axis=1, skipna=True)
+    geomeans = np.exp(log_geomeans)
+    valid = np.isfinite(geomeans) & (geomeans > 0)
+    ratios = counts.loc[valid].div(geomeans[valid], axis=0)
+    size_factors = ratios.replace([np.inf, -np.inf], np.nan).median(axis=0)
+    size_factors = size_factors.replace(0, np.nan).fillna(1.0)
+    return size_factors
+
+
+def counts_de(expression, metadata, dataset):
+    control_samples = metadata.loc[
+        metadata["condition"] == "control", "sample_id"
+    ].tolist()
+    treated_samples = metadata.loc[
+        metadata["condition"] == "treated", "sample_id"
+    ].tolist()
+    sample_columns = control_samples + treated_samples
+    counts = expression.set_index("gene_id")[sample_columns].apply(
+        pd.to_numeric, errors="coerce"
+    ).fillna(0.0)
+    size_factors = median_ratio_size_factors(counts)
+    normalized = counts.div(size_factors, axis=1)
+    log_expr = np.log2(normalized + 1.0)
+
+    control = log_expr[control_samples]
+    treated = log_expr[treated_samples]
+    log2fc = treated.mean(axis=1) - control.mean(axis=1)
+    base_mean = normalized.mean(axis=1)
+
+    pvalues = []
+    for gene_id in log_expr.index:
+        treated_values = treated.loc[gene_id].dropna()
+        control_values = control.loc[gene_id].dropna()
+        if len(treated_values) < 2 or len(control_values) < 2:
+            pvalues.append(np.nan)
+            continue
+        _, pvalue = stats.ttest_ind(
+            treated_values, control_values, equal_var=False, nan_policy="omit")
+        pvalues.append(pvalue if math.isfinite(pvalue) else np.nan)
+
+    results = pd.DataFrame({
+        "gene_id": log_expr.index.astype(str),
+        "gene": expression.set_index("gene_id").get(
+            "gene", pd.Series(log_expr.index.astype(str), index=log_expr.index)
+        ),
+        "baseMean": base_mean,
+        "log2FoldChange": log2fc,
+        "FoldChange": np.power(2, log2fc),
+        "pvalue": pvalues,
+    }).reset_index(drop=True)
+
+    annotation_columns = dataset.get("annotation_columns", [])
+    annotation_columns += [
+        column for column in expression.columns
+        if column not in sample_columns
+        and column not in ["gene_id", "gene"]
+        and column not in annotation_columns
+    ]
+    for column in annotation_columns:
+        if column in expression.columns:
+            results[column] = expression.set_index("gene_id")[column].reindex(
+                results["gene_id"]
+            ).to_numpy()
+    return results
+
+
 def load_tar_processed_text(dataset):
     archive = repo_path(dataset["archive"])
     if not archive.exists():
@@ -265,6 +335,76 @@ def load_tar_processed_text(dataset):
         column for column in expression.columns if column != "gene_id"
     ]]
     return expression, metadata
+
+
+def load_tar_gene_tables(dataset):
+    archive = repo_path(dataset["archive"])
+    if not archive.exists():
+        raise FileNotFoundError(f"Missing {archive}")
+
+    sample_regex = re.compile(dataset["sample_name_regex"])
+    value_suffix = dataset.get("value_suffix", "readcount")
+    frames = []
+    metadata_rows = []
+
+    with tarfile.open(archive) as tar:
+        members = [
+            member for member in tar.getmembers()
+            if member.isfile()
+            and dataset["processed_member_pattern"] in member.name
+        ]
+        for member in sorted(members, key=lambda item: item.name):
+            sample_match = sample_regex.search(member.name)
+            if not sample_match:
+                continue
+            sample_group = sample_match.group("sample_group")
+            replicate = sample_match.groupdict().get("replicate", "")
+            if sample_group in dataset["control_groups"]:
+                condition = "control"
+            elif sample_group in dataset["treated_groups"]:
+                condition = "treated"
+            else:
+                continue
+
+            with tar.extractfile(member) as raw:
+                handle = gzip.open(raw, "rt", errors="replace")
+                df = pd.read_csv(handle, sep="\t")
+
+            value_columns = [
+                column for column in df.columns
+                if column.lower().endswith(value_suffix.lower())
+            ]
+            if not value_columns:
+                raise ValueError(
+                    f"No {value_suffix} column found in {member.name}"
+                )
+            value_column = value_columns[0]
+            sample_id = re.sub(f"_{value_suffix}$", "", value_column)
+            gene_id_column = dataset.get("gene_id_column", "Gene_id")
+            frames.append(
+                df[[gene_id_column, value_column]]
+                .rename(columns={gene_id_column: "gene_id", value_column: sample_id})
+                .set_index("gene_id")
+            )
+            metadata_rows.append({
+                "sample_id": sample_id,
+                "dataset": dataset["name"],
+                "antibiotic_class": dataset["antibiotic_class"],
+                "treatment": dataset["treatment"],
+                "sample_group": sample_group,
+                "condition": condition,
+                "replicate": replicate,
+                "source_file": member.name,
+            })
+
+    if not frames:
+        raise ValueError(f"No configured samples found in {archive}")
+
+    expression = pd.concat(frames, axis=1).reset_index()
+    expression["gene"] = expression["gene_id"]
+    sample_columns = [row["sample_id"] for row in metadata_rows]
+    expression = expression[["gene_id", "gene"] + sample_columns]
+    return expression, pd.DataFrame(metadata_rows)
 
 
 def parse_series_matrix(path):
@@ -442,6 +582,72 @@ def load_excel_de_results(dataset):
     return results, counts, metadata
 
 
+def load_read_counts_csv(dataset):
+    path = repo_path(dataset.get("count_matrix", dataset.get("expression_matrix")))
+    if not path.exists():
+        raise FileNotFoundError(f"Missing {path}")
+
+    expression = pd.read_csv(
+        path,
+        sep=dataset.get("separator", ","),
+        encoding=dataset.get("encoding", "utf-8"),
+    )
+    gene_id_column = dataset.get("gene_id_column", "gene_id")
+    gene_column = dataset.get("gene_column", gene_id_column)
+    rename_map = {gene_id_column: "gene_id"}
+    if (
+        gene_column in expression.columns
+        and gene_column != gene_id_column
+        and gene_column != "gene"
+    ):
+        rename_map[gene_column] = "gene"
+    expression = expression.rename(columns=rename_map)
+    if "gene" not in expression.columns:
+        expression["gene"] = expression["gene_id"]
+
+    sample_columns = dataset["control_samples"] + dataset["treated_samples"]
+    missing = [column for column in sample_columns if column not in expression.columns]
+    if missing:
+        raise ValueError(f"Missing sample columns in {path}: {missing}")
+
+    keep_columns = list(dict.fromkeys(
+        ["gene_id", "gene"]
+        + dataset.get("annotation_columns", [])
+        + sample_columns
+    ))
+    expression = expression[[column for column in keep_columns if column in expression.columns]]
+    sample_aggregation = dataset.get("sample_aggregation", "sum")
+    aggregation = {
+        column: sample_aggregation if column in sample_columns else "first"
+        for column in expression.columns
+        if column != "gene_id"
+    }
+    expression = (
+        expression.dropna(subset=["gene_id"])
+        .groupby("gene_id", as_index=False)
+        .agg(aggregation)
+    )
+
+    metadata_rows = []
+    sample_groups = dataset.get("sample_groups", {})
+    for sample_id in sample_columns:
+        condition = (
+            "control" if sample_id in dataset["control_samples"]
+            else "treated"
+        )
+        metadata_rows.append({
+            "sample_id": sample_id,
+            "dataset": dataset["name"],
+            "antibiotic_class": dataset["antibiotic_class"],
+            "treatment": dataset["treatment"],
+            "sample_group": sample_groups.get(sample_id, condition),
+            "condition": condition,
+            "replicate": re.sub(r".*?rep([0-9]+)$", r"\1", sample_id),
+            "source_file": path.name,
+        })
+    return expression, pd.DataFrame(metadata_rows)
+
+
 def write_standardized(dataset, expression=None, metadata=None, results=None):
     out_dir = REPO_ROOT / "data" / dataset["name"] / "standardized"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -461,7 +667,7 @@ def write_standardized(dataset, expression=None, metadata=None, results=None):
                 df.to_excel(writer, sheet_name=name[:31], index=False)
 
 
-def write_outputs(dataset, results, make_plots=True):
+def write_outputs(dataset, results, make_plots=True, plot_limits=None):
     final_dir = OUTPUT_ROOT / dataset["name"] / "final"
     plot_dir = OUTPUT_ROOT / dataset["name"] / "plots"
     final_dir.mkdir(parents=True, exist_ok=True)
@@ -481,16 +687,28 @@ def write_outputs(dataset, results, make_plots=True):
             split.to_excel(writer, sheet_name=sheet_name, index=False)
 
     if make_plots:
-        write_volcano(dataset, results, plot_dir)
+        write_volcano(dataset, results, plot_dir, plot_limits=plot_limits)
 
 
-def write_volcano(dataset, results, plot_dir):
+def volcano_plot_frame(results):
     df = results.dropna(subset=["log2FoldChange", "padj"]).copy()
     df["neg_log10_padj"] = -np.log10(
         pd.to_numeric(df["padj"], errors="coerce")
         .fillna(1.0)
         .clip(lower=np.finfo(float).tiny)
     )
+    return df
+
+
+def fixed_volcano_limits():
+    return {
+        "x": (-10, 10),
+        "y": (0, 4),
+    }
+
+
+def write_volcano(dataset, results, plot_dir, plot_limits=None):
+    df = volcano_plot_frame(results)
     color_map = {
         "upregulated": "#d62728",
         "downregulated": "#1f77b4",
@@ -510,6 +728,9 @@ def write_volcano(dataset, results, plot_dir):
     ax.set_xlabel("log2 Fold Change")
     ax.set_ylabel("-log10 adjusted p-value")
     ax.set_title(f"{dataset['treatment']} vs control")
+    if plot_limits:
+        ax.set_xlim(plot_limits["x"])
+        ax.set_ylim(plot_limits["y"])
     fig.tight_layout()
     fig.savefig(plot_dir / f"volcano_{dataset['name']}.png", dpi=300)
     plt.close(fig)
@@ -529,6 +750,9 @@ def write_volcano(dataset, results, plot_dir):
             hover_data=hover_cols,
             title=f"{dataset['treatment']} vs control",
         )
+        if plot_limits:
+            fig_html.update_xaxes(range=list(plot_limits["x"]))
+            fig_html.update_yaxes(range=list(plot_limits["y"]))
         fig_html.write_html(plot_dir / f"volcano_{dataset['name']}.html")
     except Exception as exc:
         print(f"Could not write interactive plot for {dataset['name']}: {exc}")
@@ -551,6 +775,21 @@ def analyze_dataset(dataset, thresholds, make_plots=True):
         raw_results, counts, metadata = load_excel_de_results(dataset)
         results = finalize_results(raw_results, dataset, thresholds)
         write_standardized(dataset, expression=counts, metadata=metadata, results=results)
+    elif input_type == "read_counts_csv":
+        expression, metadata = load_read_counts_csv(dataset)
+        raw_results = counts_de(expression, metadata, dataset)
+        results = finalize_results(raw_results, dataset, thresholds)
+        write_standardized(dataset, expression=expression, metadata=metadata, results=results)
+    elif input_type == "fpkm_matrix":
+        expression, metadata = load_read_counts_csv(dataset)
+        raw_results = expression_de(expression, metadata, dataset)
+        results = finalize_results(raw_results, dataset, thresholds)
+        write_standardized(dataset, expression=expression, metadata=metadata, results=results)
+    elif input_type == "tar_gene_tables":
+        expression, metadata = load_tar_gene_tables(dataset)
+        raw_results = counts_de(expression, metadata, dataset)
+        results = finalize_results(raw_results, dataset, thresholds)
+        write_standardized(dataset, expression=expression, metadata=metadata, results=results)
     else:
         raise ValueError(f"Unknown input_type: {input_type}")
 
@@ -559,6 +798,7 @@ def analyze_dataset(dataset, thresholds, make_plots=True):
     print(f"Upregulated: {(results['regulation'] == 'upregulated').sum()}")
     print(f"Downregulated: {(results['regulation'] == 'downregulated').sum()}")
     print(f"Output: {OUTPUT_ROOT / dataset['name'] / 'final'}")
+    return results
 
 
 def main():
@@ -590,21 +830,31 @@ def main():
 
     wanted = set(args.dataset or [])
     errors = []
+    completed = []
     for dataset in config["datasets"]:
         if wanted and dataset["name"] not in wanted:
             continue
         try:
-            analyze_dataset(
-                dataset,
-                config["thresholds"],
-                make_plots=not args.no_plots,
-            )
+            results = analyze_dataset(dataset, config["thresholds"], make_plots=False)
+            completed.append((dataset, results))
         except Exception as exc:
             message = f"{dataset['name']}: {exc}"
             errors.append(message)
             print(f"SKIPPED {message}")
             if args.strict:
                 raise
+
+    if completed and not args.no_plots:
+        plot_limits = fixed_volcano_limits()
+        print(
+            "\nVolcano axes: "
+            f"x={plot_limits['x'][0]:g}..{plot_limits['x'][1]:g}, "
+            f"y={plot_limits['y'][0]:g}..{plot_limits['y'][1]:g}"
+        )
+        for dataset, results in completed:
+            plot_dir = OUTPUT_ROOT / dataset["name"] / "plots"
+            plot_dir.mkdir(parents=True, exist_ok=True)
+            write_volcano(dataset, results, plot_dir, plot_limits=plot_limits)
 
     if errors:
         print("\nCompleted with skipped datasets:")

@@ -10,7 +10,7 @@ biosensor design.
 ```text
 data/
   amoxicillin/
-    GSE47221_RAW.tar
+    GSE108190_antibiotics_resistant_mutants.txt.gz
     standardized/
   gentamicin/
     GSE44211_RAW.tar
@@ -76,7 +76,9 @@ The key parameters are:
 name                    # dataset/output folder name
 antibiotic_class        # e.g. aminoglycoside, beta_lactam
 treatment               # antibiotic name
-input_type              # tar_processed_text, series_matrix, excel_de_results
+input_type              # fpkm_matrix, series_matrix, excel_de_results
+count_matrix            # read-count CSV for read_counts_csv datasets
+expression_matrix       # FPKM matrix for fpkm_matrix datasets
 control_groups/samples  # controls
 treated_groups/samples  # antibiotic-treated samples
 value_scale             # log2 or linear

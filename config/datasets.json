@@ -7,17 +7,58 @@
     {
       "name": "amoxicillin",
       "antibiotic_class": "beta_lactam",
-      "treatment": "amoxicillin",
-      "input_type": "tar_processed_text",
-      "archive": "data/amoxicillin/GSE47221_RAW.tar",
-      "processed_member_pattern": "_processed.txt.gz",
-      "sample_name_regex": "(?P<sample_group>WT_amox|WT|512_amox|512)_(?P<replicate>[0-9]+)",
-      "control_groups": ["WT"],
-      "treated_groups": ["WT_amox"],
-      "gene_id_column": "GENE_NAME",
-      "gene_column": "GENE_NAME",
-      "annotation_columns": ["FUNCTION", "DESCRIPTION"],
-      "value_scale": "log2"
+      "treatment": "amoxicillin_resistant_mutant",
+      "comparison": "fluoxetine_30d_amoxicillin_resistant_mutant_vs_control",
+      "input_type": "fpkm_matrix",
+      "expression_matrix": "data/amoxicillin/GSE108190_antibiotics_resistant_mutants.txt.gz",
+      "separator": "\t",
+      "encoding": "latin1",
+      "control_samples": [
+        "FPKM of control-1",
+        "FPKM of control-2",
+        "FPKM of control-3"
+      ],
+      "treated_samples": [
+        "FPKM of Flu30d-Amor-1",
+        "FPKM of Flu30d-Amor-2"
+      ],
+      "sample_groups": {
+        "FPKM of control-1": "control",
+        "FPKM of control-2": "control",
+        "FPKM of control-3": "control",
+        "FPKM of Flu30d-Amor-1": "Flu30d-Amor",
+        "FPKM of Flu30d-Amor-2": "Flu30d-Amor"
+      },
+      "gene_id_column": "Gene",
+      "gene_column": "Gene",
+      "annotation_columns": [
+        "Product",
+        "Note",
+        "Locus",
+        "Protein ID",
+        "COG Class",
+        "COG Annotation",
+        "GeneID",
+        "Protein product",
+        "Protein Length",
+        "Protein name"
+      ],
+      "sample_aggregation": "mean",
+      "value_scale": "linear"
+    },
+    {
+      "name": "ceftazidime",
+      "antibiotic_class": "beta_lactam",
+      "treatment": "ceftazidime",
+      "comparison": "ceftazidime_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/ceftazidime/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>CAZ|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": ["Wu"],
+      "treated_groups": ["CAZ"],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount"
     },
     {
       "name": "gentamicin",
