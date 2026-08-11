@@ -73,7 +73,10 @@ def render_graph(graph: nx.DiGraph, output_html: str | Path, title: str = "Regul
     network.set_options("""
     {"interaction":{"hover":true,"navigationButtons":true},"physics":{"stabilization":{"iterations":300}},"edges":{"smooth":{"type":"dynamic"}}}
     """)
-    network.write_html(str(output_path), notebook=False)
+    # pyvis.write_html() uses the Windows process encoding (often cp1252),
+    # which cannot serialize names such as Greek sigma characters. Generate
+    # the document in memory and own the UTF-8 write explicitly.
+    output_path.write_text(network.generate_html(notebook=False), encoding="utf-8")
     return output_path
 
 
