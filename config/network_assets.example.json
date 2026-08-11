@@ -1,0 +1,78 @@
+{
+  "minimum_versions": {
+    "regulondb": "14.5.0",
+    "imodulon": "2.5.0"
+  },
+  "assets": [
+    {
+      "name": "regulondb_regulator_gene",
+      "kind": "regulondb",
+      "url": "https://OWNER-SUPPLIED-URL/NetworkRegulatorGene.tsv",
+      "path": "data/network_regulator_gene.tsv",
+      "version": "14.5.0",
+      "release": "14.5.0",
+      "official_revision": "RegulonDB-14.5.0",
+      "retrieved_at": "YYYY-MM-DD",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license": "RegulonDB license",
+      "citation": "RegulonDB release citation",
+      "asset_id": "regulondb-14.5.0"
+    },
+    {
+      "name": "regulondb_sigma_gene",
+      "kind": "regulondb",
+      "url": "https://OWNER-SUPPLIED-URL/NetworkSigmaGene.tsv",
+      "path": "data/network_sigma_gene.tsv",
+      "version": "14.5.0",
+      "release": "14.5.0",
+      "official_revision": "RegulonDB-14.5.0",
+      "retrieved_at": "YYYY-MM-DD",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license": "RegulonDB license",
+      "citation": "RegulonDB release citation",
+      "asset_id": "regulondb-14.5.0"
+    },
+    {
+      "name": "regulondb_k12_gene_mapping",
+      "kind": "regulondb_mapping",
+      "url": "https://OWNER-SUPPLIED-URL/K12_gene_mapping.tsv",
+      "path": "data/network_gene_mapping.tsv",
+      "version": "14.5.0",
+      "release": "14.5.0",
+      "official_revision": "RegulonDB-14.5.0",
+      "retrieved_at": "YYYY-MM-DD",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license": "RegulonDB license",
+      "citation": "RegulonDB release citation",
+      "asset_id": "regulondb-14.5.0"
+    },
+    {
+      "name": "imodulon_model",
+      "kind": "imodulon",
+      "url": "https://OWNER-SUPPLIED-URL/imodulon-model.json.gz",
+      "path": "data/imodulon/model.json.gz",
+      "version": "2.5.0",
+      "release": "2.5.0",
+      "official_revision": "OWNER-SUPPLIED-REVISION",
+      "retrieved_at": "YYYY-MM-DD",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license": "OWNER-SUPPLIED LICENSE",
+      "citation": "OWNER-SUPPLIED iModulon/PRECISE release citation",
+      "asset_id": "OWNER-SUPPLIED-RELEASE-ID"
+    },
+    {
+      "name": "imodulon_expression",
+      "kind": "expression",
+      "url": "https://OWNER-SUPPLIED-URL/imodulon-expression.csv.gz",
+      "path": "data/imodulon/expression.csv.gz",
+      "version": "2.5.0",
+      "release": "2.5.0",
+      "official_revision": "OWNER-SUPPLIED-REVISION",
+      "retrieved_at": "YYYY-MM-DD",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license": "OWNER-SUPPLIED LICENSE",
+      "citation": "OWNER-SUPPLIED iModulon/PRECISE release citation",
+      "asset_id": "OWNER-SUPPLIED-RELEASE-ID"
+    }
+  ]
+}

@@ -119,6 +119,14 @@ not_regulated
 downregulated
 ```
 
+## Regulatory network analysis
+
+The config-driven, multi-dataset regulatory-network pipeline is documented in
+[`network_analysis/README.md`](network_analysis/README.md). It requires
+versioned RegulonDB and iModulon/PRECISE assets validated by the setup manifest,
+supports both upregulated and either-direction candidate seeding, and keeps
+expression/activity evidence distinct from heuristic burden proxies.
+
 All promoter summaries are sorted by highest `signal_strength` first. Numeric
 outputs are rounded to two decimal places.
 

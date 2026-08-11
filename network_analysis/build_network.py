@@ -1,438 +1,522 @@
+"""Build a provenance-preserving regulatory network from configured DE data.
+
+The input contract is the repository's ``data/<dataset>/standardized/de_results.csv``
+schema.  Every source row is retained as evidence; only candidate seeding is
+direction-selectable.  RegulonDB edges and co-iModulon edges have distinct
+``edge_type`` values so downstream scoring cannot treat co-membership as
+regulation.
 """
-build_network.py
-────────────────
-Loads RegulonDB v12 flat files and DE results, constructs a networkx DiGraph
-of regulator → candidate-gene interactions, and saves it for downstream
-scoring and visualisation steps.
 
-RegulonDB v12 file formats (confirmed against real downloads, June 2026)
-──────────────────────────────────────────────────────────────────────
-NetworkRegulatorGene.tsv  (7 tab-separated columns, ~20-line license preamble,
-                            then a "1)colName\t2)colName..." header row)
-    1  regulatorId
-    2  regulatorName        ← regulator (TF name, or small-molecule effector
-                               name e.g. "ppGpp")
-    3  RegulatorGeneName    ← gene encoding the regulator. EMPTY for non-protein
-                               effectors — this is how we detect TF vs effector.
-    4  regulatedGeneId
-    5  regulatedGeneName    ← target gene  (NOTE: column 5, not column 2!)
-    6  function             ← '+' activate / '-' repress / '-+' dual / '' unknown
-    7  confidenceLevel      ← 'C' confirmed / 'S' strong / 'W' weak / '?' unknown
-
-NetworkSigmaGene.tsv  (5 tab-separated columns, same preamble style)
-    1  sigmaName            ← coded name, e.g. "sigma24" (NOT "RpoE")
-    2  regulatedGeneName    ← target gene
-    3  function             ← same encoding as above
-    4  promoterEvidence     ← bracketed evidence-code list (unused here)
-    5  confidenceLevel      ← same encoding as above
-
-Sigma codes map to common names by molecular weight (standard E. coli
-nomenclature) — see SIGMA_NAME_MAP below. sigma24 = RpoE = the envelope
-stress sigma factor we need for rybB/ompG; sigma32 = RpoH for ibpA/ibpB.
-
-Usage
------
-    python build_network.py \
-        --caz       ../caz_kan_DE/betalactam_primary.csv \
-        --kan       ../caz_kan_DE/kanamycin_primary.csv \
-        --regulator data/network_regulator_gene.tsv \
-        --sigma     data/network_sigma_gene.tsv \
-        --top-n 50 \
-        --out   output/
-
-Run from inside network_analysis/.
-"""
+from __future__ import annotations
 
 import argparse
+import json
 import os
 import pickle
-import sys
+import re
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Iterable
 
 import networkx as nx
 import pandas as pd
 
+try:  # Support both ``python -m network_analysis.build_network`` and direct scripts.
+    from .dataset_registry import (
+        CLASS_REGISTRY,
+        DATASET_CAVEATS,
+        REQUIRED_DE_COLUMNS,
+        configured_datasets_by_class,
+        dataset_caveats,
+        load_dataset_config,
+    )
+except ImportError:  # pragma: no cover - exercised by direct CLI use
+    from dataset_registry import (  # type: ignore
+        CLASS_REGISTRY,
+        DATASET_CAVEATS,
+        REQUIRED_DE_COLUMNS,
+        configured_datasets_by_class,
+        dataset_caveats,
+        load_dataset_config,
+    )
 
-# ── 1. Constants ───────────────────────────────────────────────────────────
 
-EFFECT_MAP = {
-    '+':  'activates',
-    '-':  'represses',
-    '-+': 'dual',
-    '+-': 'dual',     # defensive: some RegulonDB exports use this order instead
-    '?':  'unknown',
-    '':   'unknown',
-}
-
-CONFIDENCE_RANK = {'C': 3, 'S': 2, 'W': 1, '?': 0, '': 0}
-
-# Standard E. coli sigma factor naming: code (by approx. kDa) → common name.
-# Confirmed codes present in RegulonDB v12 NetworkSigmaGene.tsv: 19/24/28/32/38/54/70.
+EFFECT_MAP = {"+": "activates", "-": "represses", "-+": "dual", "+-": "dual"}
+CONFIDENCE_RANK = {"C": 3, "S": 2, "W": 1, "?": 0, "": 0}
 SIGMA_NAME_MAP = {
-    'sigma19': 'fecI',   # σ19  — iron-citrate transport
-    'sigma24': 'rpoE',   # σE/σ24 — envelope/extracytoplasmic stress (rybB, ompG)
-    'sigma28': 'fliA',   # σF/σ28 — flagellar genes
-    'sigma32': 'rpoH',   # σH/σ32 — heat shock / protein quality control (ibpA, ibpB)
-    'sigma38': 'rpoS',   # σS/σ38 — stationary phase / general stress
-    'sigma54': 'rpoN',   # σN/σ54 — nitrogen metabolism
-    'sigma70': 'rpoD',   # σD/σ70 — housekeeping / primary sigma
+    "sigma19": "feci",
+    "sigma24": "rpoe",
+    "sigma28": "flia",
+    "sigma32": "rpoh",
+    "sigma38": "rpos",
+    "sigma54": "rpon",
+    "sigma70": "rpod",
 }
+REGULATORY_EDGE_TYPES = {"activates", "represses", "dual"}
+_LOCUS_RE = re.compile(r"^b\d{4}$", re.IGNORECASE)
 
-
-# ── 2. RegulonDB parsing ──────────────────────────────────────────────────
 
 def _is_header_or_comment(parts: list[str]) -> bool:
-    """
-    RegulonDB files have a ~20-line '#'-prefixed license/citation preamble,
-    followed by ONE column-header row that does NOT start with '#' but
-    instead looks like '1)colName\\t2)colName...'. Both need skipping.
-    """
     if not parts:
         return True
     first = parts[0].strip()
-    if first.startswith('#') or first == '':
-        return True
-    # Header row pattern: "1)regulatorId", "2)regulatorName", etc.
-    if len(first) >= 2 and first[0].isdigit() and ')' in first[:4]:
-        return True
-    return False
+    return not first or first.startswith("#") or (
+        len(first) >= 2 and first[0].isdigit() and ")" in first[:4]
+    )
 
 
-def _parse_regulator_gene_file(path: str) -> list[dict]:
-    """Parse NetworkRegulatorGene.tsv (7-column format, target in col 5)."""
-    rows = []
-    with open(path, encoding='utf-8') as fh:
-        for line in fh:
-            line = line.rstrip('\n')
-            if not line:
+def _parse_regulator_gene_file(path: str | Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    with Path(path).open(encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.rstrip("\n\r").split("\t")
+            if _is_header_or_comment(parts) or len(parts) < 7:
                 continue
-            parts = line.split('\t')
-            if _is_header_or_comment(parts):
-                continue
-            if len(parts) < 7:
-                continue
-
-            regulator_name = parts[1].strip()
-            regulator_gene = parts[2].strip()   # empty ⇒ non-protein effector
-            target         = parts[4].strip()
-            effect         = parts[5].strip()
-            confidence     = parts[6].strip()
-
-            if not regulator_name or not target:
-                continue
-
-            rows.append({
-                'regulator':      regulator_name.lower(),
-                'target':         target.lower(),
-                'effect':         effect,
-                'confidence':     confidence if confidence else '?',
-                'regulator_type': 'TF' if regulator_gene else 'effector',
-                'source':         'regulator-gene',
-            })
+            regulator, regulator_gene, target, effect, confidence = (
+                parts[1].strip(), parts[2].strip(), parts[4].strip(), parts[5].strip(), parts[6].strip()
+            )
+            if regulator and target:
+                rows.append(
+                    {
+                        "regulator": regulator.lower(),
+                        "target": target.lower(),
+                        "effect": effect,
+                        "confidence": confidence or "?",
+                        "regulator_type": "TF" if regulator_gene else "effector",
+                        "source": "regulator-gene",
+                    }
+                )
     return rows
 
 
-def _parse_sigma_gene_file(path: str) -> list[dict]:
-    """Parse NetworkSigmaGene.tsv (5-column format, coded sigma names)."""
-    rows = []
-    with open(path, encoding='utf-8') as fh:
-        for line in fh:
-            line = line.rstrip('\n')
-            if not line:
+def _parse_sigma_gene_file(path: str | Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    with Path(path).open(encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.rstrip("\n\r").split("\t")
+            if _is_header_or_comment(parts) or len(parts) < 5:
                 continue
-            parts = line.split('\t')
-            if _is_header_or_comment(parts):
-                continue
-            if len(parts) < 5:
-                continue
-
-            sigma_code = parts[0].strip()
-            target     = parts[1].strip()
-            effect     = parts[2].strip()
-            confidence = parts[4].strip()
-
-            if not sigma_code or not target:
-                continue
-
-            regulator = SIGMA_NAME_MAP.get(sigma_code.lower(), sigma_code)
-
-            rows.append({
-                'regulator':      regulator.lower(),
-                'target':         target.lower(),
-                'effect':         effect,
-                'confidence':     confidence if confidence else '?',
-                'regulator_type': 'sigma',
-                'source':         'sigma-gene',
-            })
+            sigma, target, effect, confidence = parts[0].strip(), parts[1].strip(), parts[2].strip(), parts[4].strip()
+            if sigma and target:
+                rows.append(
+                    {
+                        "regulator": SIGMA_NAME_MAP.get(sigma.lower(), sigma.lower()),
+                        "target": target.lower(),
+                        "effect": effect,
+                        "confidence": confidence or "?",
+                        "regulator_type": "sigma",
+                        "source": "sigma-gene",
+                    }
+                )
     return rows
 
 
-def load_regulondb(regulator_gene_path: str,
-                   sigma_gene_path: str | None = None,
-                   min_confidence: str = 'W') -> pd.DataFrame:
-    """
-    Load and combine RegulonDB regulator-gene and sigma-gene flat files.
+def load_regulondb(
+    regulator_gene_path: str | Path,
+    sigma_gene_path: str | Path | None = None,
+    min_confidence: str = "W",
+) -> pd.DataFrame:
+    """Load same-release RegulonDB flat files and collapse duplicate evidence."""
 
-    min_confidence : keep interactions with confidence ≥ this level.
-                     Rank order: C (confirmed) > S (strong) > W (weak) > ? (unknown).
-                     Default 'W' keeps everything with any curated evidence.
-                     Use 'S' to require strong-or-better evidence only.
-
-    Returns a DataFrame with columns:
-        regulator, target, effect, edge_type, confidence, regulator_type, source
-    Duplicate (regulator, target) pairs — common when RegulonDB has multiple
-    evidence lines for the same interaction — are collapsed to the single
-    highest-confidence row.
-    """
     rows = _parse_regulator_gene_file(regulator_gene_path)
-    if sigma_gene_path and os.path.exists(sigma_gene_path):
-        rows += _parse_sigma_gene_file(sigma_gene_path)
-    else:
-        if sigma_gene_path:
-            print(f"[warn] sigma-gene file not found: {sigma_gene_path}")
-            print("       Sigma factor edges (rpoE→rybB, rpoH→ibpA/B) will be absent.")
-
-    df = pd.DataFrame(rows)
-    if df.empty:
-        sys.exit("[error] No regulatory interactions parsed. Check file paths/format.")
-
-    df['edge_type'] = df['effect'].map(EFFECT_MAP).fillna('unknown')
-    df['conf_rank'] = df['confidence'].map(CONFIDENCE_RANK).fillna(0)
-
-    # Apply confidence floor
-    min_rank = CONFIDENCE_RANK.get(min_confidence, 0)
-    n_before = len(df)
-    df = df[df['conf_rank'] >= min_rank].copy()
-    if len(df) < n_before:
-        print(f"[regulondb] confidence filter (≥{min_confidence}): "
-              f"{n_before:,} → {len(df):,} rows")
-
-    # Drop unknown-direction edges — not useful for direction-sensitive scoring
-    df = df[df['edge_type'] != 'unknown'].copy()
-
-    # Collapse duplicate (regulator, target) pairs: keep highest-confidence row
-    n_before = len(df)
-    df = (df.sort_values('conf_rank', ascending=False)
-            .drop_duplicates(subset=['regulator', 'target'], keep='first'))
-    if len(df) < n_before:
-        print(f"[regulondb] collapsed {n_before - len(df):,} duplicate "
-              f"(regulator, target) evidence rows")
-
-    n_tf       = (df.drop_duplicates('regulator')['regulator_type'] == 'TF').sum()
-    n_sigma    = (df.drop_duplicates('regulator')['regulator_type'] == 'sigma').sum()
-    n_effector = (df.drop_duplicates('regulator')['regulator_type'] == 'effector').sum()
-    print(f"[regulondb] loaded {len(df):,} interactions "
-          f"({df['regulator'].nunique()} regulators → {df['target'].nunique()} genes)")
-    print(f"            regulator types: {n_tf} TF, {n_sigma} sigma, {n_effector} effector")
-
-    return df
+    if sigma_gene_path and Path(sigma_gene_path).exists():
+        rows.extend(_parse_sigma_gene_file(sigma_gene_path))
+    elif sigma_gene_path:
+        print(f"[warn] sigma-gene file not found: {sigma_gene_path}")
+    if not rows:
+        raise ValueError("No regulatory interactions parsed; check RegulonDB paths and release format")
+    frame = pd.DataFrame(rows)
+    frame["edge_type"] = frame["effect"].map(EFFECT_MAP).fillna("unknown")
+    frame["conf_rank"] = frame["confidence"].map(CONFIDENCE_RANK).fillna(0)
+    minimum = CONFIDENCE_RANK.get(min_confidence, 0)
+    frame = frame[frame["conf_rank"] >= minimum]
+    frame = frame[frame["edge_type"].isin(REGULATORY_EDGE_TYPES)].copy()
+    frame = frame.sort_values("conf_rank", ascending=False).drop_duplicates(["regulator", "target"])
+    return frame.reset_index(drop=True)
 
 
-# ── 3. DE result loading ─────────────────────────────────────────────────
+def _clean(value: Any) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip().lower()
 
-def load_de_results(caz_path: str,
-                    kan_path: str,
-                    top_n: int | None = None,
-                    min_fc: float = 0.0) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+def _first_value(row: pd.Series, columns: Iterable[str]) -> str:
+    for column in columns:
+        if column in row and _clean(row[column]):
+            return _clean(row[column])
+    return ""
+
+
+def load_identity_mapping(path: str | Path | None) -> dict[str, tuple[str, str]]:
+    """Load a same-release gene/locus mapping as ``token -> (gene, locus)``."""
+
+    if not path:
+        return {}
+    mapping_path = Path(path)
+    if not mapping_path.exists():
+        raise FileNotFoundError(
+            f"Identity mapping not found: {mapping_path}. "
+            "Ceftazidime b-number identifiers and probe aliases require a same-release mapping."
+        )
+    frame = pd.read_csv(mapping_path, sep=None, engine="python")
+    frame.columns = [str(column).strip().lower() for column in frame.columns]
+    result: dict[str, tuple[str, str]] = {}
+    gene_columns = ("canonical_gene", "gene", "gene_name", "symbol", "gene_symbol", "name")
+    locus_columns = ("canonical_locus_tag", "locus_tag", "b_number", "gene_id", "locus")
+    alias_columns = ("alias", "aliases", "probe_id", "gene_id", "locus_tag", "b_number", "gene")
+    for _, row in frame.iterrows():
+        gene = _first_value(row, gene_columns)
+        locus = _first_value(row, locus_columns)
+        aliases = {_clean(row[column]) for column in alias_columns if column in row and _clean(row[column])}
+        aliases.update({gene, locus})
+        aliases.discard("")
+        if not gene and locus:
+            gene = locus
+        for alias in aliases:
+            result.setdefault(alias, (gene, locus))
+    return result
+
+
+def _identity(row: pd.Series, mapping: dict[str, tuple[str, str]]) -> tuple[str, str, str, str]:
+    source_gene = _clean(row.get("gene"))
+    source_gene_id = _first_value(row, ("gene_id", "gene", "probe_id"))
+    source_locus = _first_value(row, ("locus_tag", "b_number", "locus"))
+    tokens = [source_locus, source_gene_id, source_gene]
+    for token in tokens:
+        if token and token in mapping:
+            gene, locus = mapping[token]
+            return gene or token, locus or (token if _LOCUS_RE.match(token) else ""), "same_release_mapping", source_locus
+    fallback = source_gene or source_gene_id or source_locus
+    return fallback, source_locus or (source_gene_id if _LOCUS_RE.match(source_gene_id) else ""), "source_gene", source_locus
+
+
+def _normalize_regulation(row: pd.Series, fc_threshold: float) -> str:
+    raw = _clean(row.get("regulation"))
+    if raw in {"upregulated", "up", "induced"}:
+        return "upregulated"
+    if raw in {"downregulated", "down", "repressed"}:
+        return "downregulated"
+    if raw in {"not_regulated", "not regulated", "ns", "none"}:
+        fc = pd.to_numeric(row.get("log2FoldChange"), errors="coerce")
+        padj = pd.to_numeric(row.get("padj"), errors="coerce")
+        if pd.notna(fc) and pd.notna(padj) and padj <= 0.05 and abs(fc) >= fc_threshold:
+            return "upregulated" if fc > 0 else "downregulated"
+        return "not_regulated"
+    fc = pd.to_numeric(row.get("log2FoldChange"), errors="coerce")
+    return "upregulated" if pd.notna(fc) and fc > 0 else "downregulated" if pd.notna(fc) else "unknown"
+
+
+def load_de_results(
+    config_path: str | Path,
+    data_dir: str | Path | None = None,
+    mapping_path: str | Path | None = None,
+    candidate_direction: str = "upregulated",
+    top_n: int | None = None,
+    min_fc: float | None = None,
+) -> pd.DataFrame:
+    """Load all configured standardized DE files and derive candidate seeds.
+
+    ``candidate_direction`` controls only seeding.  Non-qualifying observations
+    remain in the returned frame and are attached to candidate nodes as evidence.
     """
-    Load primary candidate CSVs produced by deseq2_caz.py / deseq2_kan.py.
 
-    Expected columns (from pydeseq2 output):
-        gene, log2FoldChange, padj  (plus baseMean, lfcSE, stat — all ignored here)
-
-    top_n  : keep only the top-N genes by log2FC per class (guards against
-              the 896-gene kanamycin list blowing up the visualisation).
-    min_fc : hard lower bound on log2FC (applied before top_n).
-    """
-    def _read(path, label):
-        df = pd.read_csv(path, index_col=0)
-        df.columns = df.columns.str.strip()
-        if 'gene' not in df.columns:
-            raise ValueError(f"No 'gene' column in {path}. "
-                             f"Columns found: {list(df.columns)}")
-        df = df.dropna(subset=['gene', 'log2FoldChange'])
-        df['gene'] = df['gene'].str.strip().str.lower()
-        df = df[df['log2FoldChange'] >= min_fc]
-        if top_n:
-            df = df.nlargest(top_n, 'log2FoldChange')
-        print(f"[de] {label}: {len(df)} candidates "
-              f"(log2FC ≥ {min_fc:.1f}{f', top {top_n}' if top_n else ''})")
-        return df
-
-    caz = _read(caz_path, 'ceftazidime')
-    kan = _read(kan_path, 'kanamycin')
-    return caz, kan
-
-
-# ── 4. Graph construction ────────────────────────────────────────────────
-
-def build_graph(df_caz: pd.DataFrame,
-                df_kan: pd.DataFrame,
-                regulondb: pd.DataFrame,
-                min_tf_degree: int = 1,
-                include_effectors: bool = True) -> nx.DiGraph:
-    """
-    Build a directed networkx graph:
-        Nodes  — candidate DE genes + their regulators (TF / sigma / effector)
-        Edges  — regulator → gene interactions from RegulonDB
-
-    Node attributes
-    ───────────────
-    group           : 'caz' | 'kan' | 'cross' | 'tf'
-                       (NOTE: 'tf' is the umbrella group for ALL regulator
-                       nodes — TFs, sigma factors, AND small-molecule
-                       effectors — kept for backward compatibility with
-                       scoring code that filters on group=='tf'.)
-    regulator_type  : 'TF' | 'sigma' | 'effector' (only set on regulator nodes;
-                       lets you distinguish a clonable TF binding site from
-                       a small-molecule effector like ppGpp that has no
-                       discrete DNA binding site to clone)
-    fc_caz / fc_kan : log2FC values (0 for regulator nodes)
-    label           : display name
-
-    Edge attributes
-    ───────────────
-    edge_type  : 'activates' | 'represses' | 'dual'
-    confidence : 'C' | 'S' | 'W' | '?'
-    source     : 'regulator-gene' | 'sigma-gene'
-
-    min_tf_degree     : only add a regulator node if it regulates at least
-                        this many candidates. Default 1 (include all).
-    include_effectors : if False, drop small-molecule effectors (e.g. ppGpp)
-                        entirely — useful if you want a graph of only
-                        clonable TF/sigma binding sites.
-    """
-    G = nx.DiGraph()
-
-    caz_fc = dict(zip(df_caz['gene'], df_caz['log2FoldChange']))
-    kan_fc = dict(zip(df_kan['gene'], df_kan['log2FoldChange']))
-    caz_genes = set(caz_fc)
-    kan_genes = set(kan_fc)
-    cross_genes = caz_genes & kan_genes
-
-    for gene in caz_genes | kan_genes:
-        if gene in cross_genes:
-            group = 'cross'
-        elif gene in caz_genes:
-            group = 'caz'
+    if candidate_direction not in {"upregulated", "either-direction"}:
+        raise ValueError("candidate_direction must be 'upregulated' or 'either-direction'")
+    config = load_dataset_config(config_path)
+    root = Path(data_dir) if data_dir else Path(config["_path"]).parents[1]
+    mapping = load_identity_mapping(mapping_path)
+    fc_threshold = float(min_fc if min_fc is not None else config["thresholds"]["log2_fold_change"])
+    padj_threshold = float(config["thresholds"]["padj"])
+    frames: list[pd.DataFrame] = []
+    for dataset in config["datasets"]:
+        name = dataset["name"]
+        path = root / "data" / name / "standardized" / "de_results.csv"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Standardized DE file missing for {name}: {path}. "
+                "Run the upstream DE analysis or setup documented in network_analysis/README.md."
+            )
+        frame = pd.read_csv(path)
+        frame.columns = [str(column).strip() for column in frame.columns]
+        missing = REQUIRED_DE_COLUMNS - set(frame.columns)
+        if missing:
+            raise ValueError(f"{path} missing required DE columns: {sorted(missing)}")
+        frame = frame.copy()
+        frame["source_dataset"] = name
+        frame["antibiotic_class"] = dataset["antibiotic_class"]
+        frame["source_gene"] = frame["gene"].astype(str).str.strip()
+        frame["source_gene_id"] = frame.apply(lambda row: _first_value(row, ("gene_id", "gene", "probe_id")), axis=1)
+        identities = frame.apply(lambda row: _identity(row, mapping), axis=1, result_type="expand")
+        identities.columns = ["canonical_gene", "canonical_locus_tag", "identity_source", "source_locus_tag"]
+        frame = pd.concat([frame, identities], axis=1)
+        frame["canonical_gene"] = frame["canonical_gene"].replace("", pd.NA).fillna(frame["source_gene"].map(_clean))
+        frame["canonical_gene"] = frame["canonical_gene"].map(_clean)
+        frame["canonical_locus_tag"] = frame["canonical_locus_tag"].map(_clean)
+        frame["source_locus_tag"] = frame["source_locus_tag"].map(_clean)
+        frame["log2FoldChange"] = pd.to_numeric(frame["log2FoldChange"], errors="coerce")
+        frame["padj"] = pd.to_numeric(frame["padj"], errors="coerce")
+        frame["regulation"] = frame.apply(lambda row: _normalize_regulation(row, fc_threshold), axis=1)
+        frame["is_significant"] = frame["padj"].le(padj_threshold) & frame["log2FoldChange"].abs().ge(fc_threshold)
+        frame["is_qualifying_direction"] = frame["is_significant"] & (
+            frame["regulation"].eq("upregulated")
+            if candidate_direction == "upregulated"
+            else frame["regulation"].isin(["upregulated", "downregulated"])
+        )
+        if "signal_strength" in frame.columns:
+            frame["signal_strength"] = pd.to_numeric(frame["signal_strength"], errors="coerce").fillna(
+                frame["log2FoldChange"].abs()
+            )
         else:
-            group = 'kan'
-        G.add_node(gene,
-                   group=group,
-                   regulator_type=None,
-                   fc_caz=round(caz_fc.get(gene, 0.0), 3),
-                   fc_kan=round(kan_fc.get(gene, 0.0), 3),
-                   label=gene)
+            frame["signal_strength"] = frame["log2FoldChange"].abs()
+        if "padj_source" in frame.columns:
+            frame["padj_source"] = frame["padj_source"].fillna("unknown")
+        else:
+            frame["padj_source"] = "unknown"
+        frame["source_row_id"] = [f"{name}:{index}" for index in frame.index]
+        frames.append(frame)
+    observations = pd.concat(frames, ignore_index=True)
+    observations["candidate_seed"] = observations.groupby("canonical_gene")["is_qualifying_direction"].transform("any")
+    if top_n and top_n > 0:
+        candidates = observations[observations["candidate_seed"]].drop_duplicates("canonical_gene")
+        keep = set(
+            candidates.sort_values("signal_strength", ascending=False)
+            .groupby("antibiotic_class", sort=False)
+            .head(top_n)["canonical_gene"]
+        )
+        observations["candidate_seed"] &= observations["canonical_gene"].isin(keep)
+    observations.attrs["candidate_direction_policy"] = candidate_direction
+    return observations
 
-    all_candidates = caz_genes | kan_genes
-    relevant = regulondb[regulondb['target'].isin(all_candidates)].copy()
 
-    if not include_effectors:
-        n_before = len(relevant)
-        relevant = relevant[relevant['regulator_type'] != 'effector']
-        if len(relevant) < n_before:
-            print(f"[graph] excluded {n_before - len(relevant)} effector "
-                  f"interactions (--no-effectors)")
+def _json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, default=str)
 
-    reg_degrees = relevant.groupby('regulator')['target'].nunique()
-    regs_to_add = set(reg_degrees[reg_degrees >= min_tf_degree].index)
 
-    for _, row in relevant.iterrows():
-        reg = row['regulator']
-        gene = row['target']
-        if reg not in regs_to_add:
+def aggregate_candidate_evidence(observations: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
+    """Collapse observations by canonical gene without discarding provenance."""
+
+    if observations.empty:
+        return pd.DataFrame()
+    configured = configured_datasets_by_class(config)
+    rows: list[dict[str, Any]] = []
+    for gene, group in observations[observations["candidate_seed"]].groupby("canonical_gene", sort=True):
+        significant = group[group["is_significant"]]
+        qualifying = group[group["is_qualifying_direction"]]
+        up_count = int((significant["regulation"] == "upregulated").sum())
+        down_count = int((significant["regulation"] == "downregulated").sum())
+        direction_conflict = up_count > 0 and down_count > 0
+        sig_classes = sorted(qualifying["antibiotic_class"].unique().tolist())
+        evidence_by_dataset: list[dict[str, Any]] = []
+        for dataset, dataset_group in group.groupby("source_dataset", sort=True):
+            evidence_by_dataset.append(
+                {
+                    "source_dataset": dataset,
+                    "antibiotic_class": str(dataset_group["antibiotic_class"].iloc[0]),
+                    "observed": True,
+                    "significant": bool(dataset_group["is_significant"].any()),
+                    "qualifying": bool(dataset_group["is_qualifying_direction"].any()),
+                    "regulations": sorted(dataset_group["regulation"].dropna().unique().tolist()),
+                    "log2FoldChange": [float(x) for x in dataset_group["log2FoldChange"].dropna().tolist()],
+                    "padj": [float(x) for x in dataset_group["padj"].dropna().tolist()],
+                    "source_row_ids": dataset_group["source_row_id"].tolist(),
+                }
+            )
+        tiers: dict[str, str] = {}
+        support_fraction: dict[str, float] = {}
+        observed_by_class: dict[str, list[str]] = {}
+        significant_by_class: dict[str, list[str]] = {}
+        for class_key, datasets in configured.items():
+            class_group = group[group["antibiotic_class"] == class_key]
+            class_qualifying = qualifying[qualifying["antibiotic_class"] == class_key]
+            class_significant = significant[significant["antibiotic_class"] == class_key]
+            observed_by_class[class_key] = sorted(class_group["source_dataset"].unique().tolist())
+            significant_by_class[class_key] = sorted(class_qualifying["source_dataset"].unique().tolist())
+            support_fraction[class_key] = round(len(significant_by_class[class_key]) / len(datasets), 3) if datasets else 0.0
+            if not significant_by_class[class_key]:
+                continue
+            if direction_conflict:
+                tiers[class_key] = "conflicted"
+            elif set(significant_by_class[class_key]) == {"tobramycin"}:
+                tiers[class_key] = "limited"
+            elif len(significant_by_class[class_key]) == len(datasets):
+                tiers[class_key] = "corroborated"
+            else:
+                tiers[class_key] = "supported"
+        if direction_conflict:
+            tier = "conflicted"
+        elif any(value == "corroborated" for value in tiers.values()):
+            tier = "corroborated"
+        elif qualifying["source_dataset"].nunique() == 1 and qualifying["source_dataset"].iloc[0] == "tobramycin":
+            tier = "limited"
+        else:
+            tier = "supported"
+        caveats = sorted({c for dataset in group["source_dataset"].unique() for c in dataset_caveats(dataset)})
+        flags: list[str] = []
+        if direction_conflict:
+            flags.append("direction_conflict")
+        if set(qualifying["source_dataset"]) == {"tobramycin"}:
+            flags.append("tobramycin_only")
+        if (group["identity_source"] != "same_release_mapping").any():
+            flags.append("identity_mapping_not_verified")
+        rows.append(
+            {
+                "canonical_gene": gene,
+                "canonical_locus_tag": next((x for x in group["canonical_locus_tag"] if x), ""),
+                "group": "cross" if len(sig_classes) > 1 else (sig_classes[0] if sig_classes else "unknown"),
+                "node_type": "candidate",
+                "n_datasets_observed": int(group["source_dataset"].nunique()),
+                "n_datasets_significant": int(qualifying["source_dataset"].nunique()),
+                "n_significant_source_rows": int(len(significant)),
+                "n_source_rows": int(len(group)),
+                "upregulated_dataset_count": int(qualifying[qualifying["regulation"] == "upregulated"]["source_dataset"].nunique()),
+                "downregulated_dataset_count": int(qualifying[qualifying["regulation"] == "downregulated"]["source_dataset"].nunique()),
+                "datasets_observed_by_class": observed_by_class,
+                "datasets_significant_by_class": significant_by_class,
+                "configured_datasets_by_class": configured,
+                "support_fraction_by_class": support_fraction,
+                "evidence_tier_by_class": tiers,
+                "evidence_tier": tier,
+                "significant_classes": sig_classes,
+                "direction_consistent": not direction_conflict,
+                "candidate_direction_policy": observations.attrs.get("candidate_direction_policy", "upregulated"),
+                "dataset_evidence_json": _json(evidence_by_dataset),
+                "source_observations_json": _json(
+                    group[
+                        [
+                            "source_dataset", "antibiotic_class", "source_gene", "source_gene_id",
+                            "source_locus_tag", "canonical_gene", "canonical_locus_tag", "identity_source",
+                            "log2FoldChange", "padj", "signal_strength", "regulation", "padj_source",
+                        ]
+                    ].to_dict("records")
+                ),
+                "source_row_ids": group["source_row_id"].tolist(),
+                "direction_conflict": direction_conflict,
+                "collapse_method": "canonical_gene; preserve all source rows",
+                "signal_strength": float(group["signal_strength"].max()),
+                "max_abs_log2_fold_change": float(group["log2FoldChange"].abs().max()),
+                "caveats": caveats,
+                "evidence_quality_flags": flags,
+                "tobramycin_only": "tobramycin_only" in flags,
+                "regulation_by_dataset": {
+                    dataset: sorted(dataset_group["regulation"].unique().tolist())
+                    for dataset, dataset_group in group.groupby("source_dataset", sort=True)
+                },
+            }
+        )
+    result = pd.DataFrame(rows)
+    if not result.empty:
+        result["candidate_direction_policy"] = observations["is_qualifying_direction"].attrs.get(
+            "candidate_direction_policy", "configured"
+        )
+    return result
+
+
+def build_graph(
+    observations: pd.DataFrame,
+    regulondb: pd.DataFrame,
+    config: dict[str, Any],
+    candidate_direction: str = "upregulated",
+) -> nx.DiGraph:
+    """Build a graph with typed regulatory edges and candidate evidence."""
+
+    observations = observations.copy()
+    observations.attrs["candidate_direction_policy"] = candidate_direction
+    candidates = aggregate_candidate_evidence(observations, config)
+    graph = nx.DiGraph()
+    if candidates.empty:
+        return graph
+    for row in candidates.to_dict("records"):
+        attrs = dict(row)
+        attrs["candidate_direction_policy"] = candidate_direction
+        graph.add_node(row["canonical_gene"], **attrs)
+    candidate_names = set(candidates["canonical_gene"])
+    for edge in regulondb.to_dict("records"):
+        target = str(edge["target"]).lower()
+        if target not in candidate_names:
             continue
-
-        if reg not in G.nodes:
-            G.add_node(reg, group='tf', regulator_type=row['regulator_type'],
-                      fc_caz=0.0, fc_kan=0.0, label=reg)
-
-        if not G.has_edge(reg, gene):
-            G.add_edge(reg, gene,
-                       edge_type=row['edge_type'],
-                       confidence=row['confidence'],
-                       source=row['source'])
-
-    n_reg = sum(1 for _, d in G.nodes(data=True) if d['group'] == 'tf')
-    n_candidate = len(G) - n_reg
-    n_tf_nodes       = sum(1 for _, d in G.nodes(data=True) if d.get('regulator_type') == 'TF')
-    n_sigma_nodes    = sum(1 for _, d in G.nodes(data=True) if d.get('regulator_type') == 'sigma')
-    n_effector_nodes = sum(1 for _, d in G.nodes(data=True) if d.get('regulator_type') == 'effector')
-    print(f"[graph] {n_candidate} candidate nodes, {n_reg} regulator nodes "
-          f"({n_tf_nodes} TF, {n_sigma_nodes} sigma, {n_effector_nodes} effector), "
-          f"{G.number_of_edges()} edges")
-
-    expected = ['reca', 'cpxp', 'rybb', 'ibpb', 'ibpa', 'sula', 'recn', 'dgcz', 'pdel']
-    missing = [g for g in expected if g not in G.nodes]
-    if missing:
-        print(f"[graph] note: expected candidates absent from graph: {missing}")
-        print("         (check that they appear in the DE input files and pass FC filter)")
-
-    return G
+        regulator = str(edge["regulator"]).lower()
+        graph.add_node(
+            regulator,
+            node_type="regulator",
+            group="tf",
+            regulator_type=edge.get("regulator_type", "TF"),
+            label=regulator,
+        )
+        graph.add_edge(
+            regulator,
+            target,
+            edge_type=edge["edge_type"],
+            interaction_type="regulatory",
+            confidence=edge.get("confidence", "?"),
+            source=edge.get("source", "RegulonDB"),
+        )
+    return graph
 
 
-# ── 5. Persistence ───────────────────────────────────────────────────────
-
-def save_graph(G: nx.DiGraph, out_dir: str) -> None:
-    os.makedirs(out_dir, exist_ok=True)
-
-    pickle_path = os.path.join(out_dir, 'regulatory_network.pkl')
-    with open(pickle_path, 'wb') as fh:
-        pickle.dump(G, fh)
-    print(f"[save] graph → {pickle_path}")
-
-    rows = [{'gene': node, **data} for node, data in G.nodes(data=True)]
-    node_df = pd.DataFrame(rows)
-    node_path = os.path.join(out_dir, 'node_table.csv')
-    node_df.to_csv(node_path, index=False)
-    print(f"[save] node table ({len(node_df)} rows) → {node_path}")
-
-
-# ── 6. Entry point ───────────────────────────────────────────────────────
-
-def parse_args():
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--caz',   default='../caz_kan_DE/betalactam_primary.csv',
-                   help='Ceftazidime primary candidates CSV')
-    p.add_argument('--kan',   default='../caz_kan_DE/kanamycin_primary.csv',
-                   help='Kanamycin primary candidates CSV')
-    p.add_argument('--regulator', default='../data/network_regulator_gene.tsv',
-                   help='RegulonDB NetworkRegulatorGene.tsv (7-column format)')
-    p.add_argument('--sigma',     default='../data/network_sigma_gene.tsv',
-                   help='RegulonDB NetworkSigmaGene.tsv (5-column format, optional but recommended)')
-    p.add_argument('--top-n', type=int, default=50,
-                   help='Keep top-N candidates per class by log2FC (default: 50)')
-    p.add_argument('--min-fc', type=float, default=2.0,
-                   help='Minimum log2FC threshold (default: 2.0 = primary candidates)')
-    p.add_argument('--min-tf-degree', type=int, default=1,
-                   help='Only include regulators touching ≥ this many candidates (default: 1)')
-    p.add_argument('--min-confidence', default='W', choices=['C', 'S', 'W'],
-                   help='Minimum RegulonDB confidence level to include (default: W = all evidence)')
-    p.add_argument('--no-effectors', action='store_true',
-                   help='Exclude small-molecule effectors (e.g. ppGpp) — keep only TF/sigma regulators')
-    p.add_argument('--out',   default='output/',
-                   help='Output directory')
-    return p.parse_args()
+def save_graph(graph: nx.DiGraph, out_dir: str | Path, observations: pd.DataFrame | None = None) -> tuple[Path, Path]:
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    pickle_path = output / "regulatory_network.pkl"
+    node_path = output / "node_table.csv"
+    with pickle_path.open("wb") as handle:
+        pickle.dump(graph, handle)
+    records: list[dict[str, Any]] = []
+    for node, attrs in graph.nodes(data=True):
+        record = {"node": node, **attrs}
+        for key, value in list(record.items()):
+            if isinstance(value, (dict, list, tuple, set)):
+                record[key] = _json(value)
+        records.append(record)
+    pd.DataFrame(records).to_csv(node_path, index=False)
+    if observations is not None:
+        observations.to_csv(output / "source_observations.csv", index=False)
+    return pickle_path, node_path
 
 
-def main():
-    args = parse_args()
-
-    for path, name in [(args.caz, '--caz'), (args.kan, '--kan'), (args.regulator, '--regulator')]:
-        if not os.path.exists(path):
-            sys.exit(f"[error] {name} file not found: {path}\n"
-                     f"        Run from inside network_analysis/ and check paths.")
-
-    regulondb = load_regulondb(args.regulator, args.sigma, min_confidence=args.min_confidence)
-    df_caz, df_kan = load_de_results(args.caz, args.kan,
-                                     top_n=args.top_n,
-                                     min_fc=args.min_fc)
-    G = build_graph(df_caz, df_kan, regulondb,
-                    min_tf_degree=args.min_tf_degree,
-                    include_effectors=not args.no_effectors)
-    save_graph(G, args.out)
-    print("\nNext: python score_candidates.py")
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
 
 
-if __name__ == '__main__':
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    root = _repo_root()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=root / "config" / "datasets.json")
+    parser.add_argument("--data-dir", default=root)
+    parser.add_argument("--mapping", default=None, help="Same-release gene/locus mapping TSV or CSV")
+    parser.add_argument("--regulator", default=root / "data" / "network_regulator_gene.tsv")
+    parser.add_argument("--sigma", default=root / "data" / "network_sigma_gene.tsv")
+    parser.add_argument("--min-confidence", choices=sorted(CONFIDENCE_RANK), default="W")
+    parser.add_argument("--candidate-direction", choices=["upregulated", "either-direction"], default="upregulated")
+    parser.add_argument("--top-n", type=int, default=None)
+    parser.add_argument("--min-fc", type=float, default=None)
+    parser.add_argument("--out", default=root / "network_analysis" / "output")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+    config = load_dataset_config(args.config)
+    observations = load_de_results(
+        args.config,
+        args.data_dir,
+        args.mapping,
+        args.candidate_direction,
+        args.top_n,
+        args.min_fc,
+    )
+    if not Path(args.regulator).exists():
+        raise FileNotFoundError(
+            f"RegulonDB regulator file missing: {args.regulator}. "
+            "Run network_analysis/setup_data.py with a >=14.5.0 release asset."
+        )
+    regulondb = load_regulondb(args.regulator, args.sigma, args.min_confidence)
+    graph = build_graph(observations, regulondb, config, args.candidate_direction)
+    pickle_path, node_path = save_graph(graph, args.out, observations)
+    print(f"[network] {graph.number_of_nodes():,} nodes, {graph.number_of_edges():,} edges")
+    print(f"[save] {pickle_path}")
+    print(f"[save] {node_path}")
+
+
+if __name__ == "__main__":
     main()

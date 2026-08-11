@@ -1,215 +1,128 @@
-# network_analysis/
+# Regulatory network analysis
 
-Regulatory network pipeline: maps DE candidates onto the RegulonDB v12
-*E. coli* K-12 transcriptional regulatory network, scores candidates
-by regulator specificity, and produces an interactive pyvis visualisation.
+This pipeline builds a typed *RegulonDB regulator → candidate* graph from all
+datasets listed in `config/datasets.json`, enriches it with same-release
+iModulon/PRECISE evidence, and writes a candidate table plus an interactive
+HTML network. It is a heuristic screening aid: expression/activity values are
+reported as evidence and burden values are proxies, not measured burden.
 
-## Setup
+## Data contract and setup
 
-### 1. Install dependencies
-
-```bash
-pip install networkx pyvis pandas
-# or, if your system Python conflicts:
-pip install networkx pyvis pandas --break-system-packages
-```
-
-### 2. Download RegulonDB flat files
-
-Go to **regulondb.ccg.unam.mx/datasets** and download these two files into
-`network_analysis/data/`:
-
-| Download page label | Save as |
-|---|---|
-| **NetworkRegulatorGene** — "Regulatory Interactions" → TF-gene, TF-TU etc. (this is the merged file covering ALL regulator types: TFs, sigma factors are *not* in here, but small-molecule effectors like ppGpp are) | `network_regulator_gene.tsv` |
-| **NetworkSigmaGene** — sigma factor → gene interactions | `network_sigma_gene.tsv` |
-
-The sigma-gene file is essential for RpoE→rybB and RpoH→ibpA/ibpB edges —
-without it, your best aminoglycoside candidates will show `biosensor_flag = ?`
-despite having clean, well-characterised upstream regulation.
-
-### Real file format (confirmed against RegulonDB Release 14.5 / v12.0 downloads)
-
-Both files share the same structure: a ~20-line `#`-prefixed license/citation
-preamble, then **one header row that does NOT start with `#`** — it looks like
-`1)colName\t2)colName...` — followed by tab-separated data.
-
-**`network_regulator_gene.tsv`** (7 columns):
-```
-1  regulatorId
-2  regulatorName        ← TF name, OR small-molecule effector name (e.g. "ppGpp")
-3  RegulatorGeneName     ← gene encoding the regulator. EMPTY for non-protein
-                            effectors — this is how the pipeline tells TF from effector.
-4  regulatedGeneId
-5  regulatedGeneName     ← target gene  (note: column 5, not column 2)
-6  function              ← '+' activate / '-' repress / '-+' dual / '' unknown
-7  confidenceLevel       ← 'C' confirmed / 'S' strong / 'W' weak / '?' unknown
-```
-
-**`network_sigma_gene.tsv`** (5 columns):
-```
-1  sigmaName             ← coded name, e.g. "sigma24" — NOT "RpoE"
-2  regulatedGeneName     ← target gene
-3  function              ← same encoding as above
-4  promoterEvidence      ← bracketed evidence-code list (unused)
-5  confidenceLevel        ← same encoding as above
-```
-
-Sigma codes are mapped to common names internally (standard *E. coli*
-nomenclature by molecular weight):
-
-| Code | Common name | Role |
-|---|---|---|
-| sigma19 | FecI | iron-citrate transport |
-| sigma24 | **RpoE** | envelope/extracytoplasmic stress → **rybB, ompG** |
-| sigma28 | FliA | flagellar genes |
-| sigma32 | **RpoH** | heat shock / protein QC → **ibpA, ibpB** |
-| sigma38 | RpoS | stationary phase / general stress |
-| sigma54 | RpoN | nitrogen metabolism |
-| sigma70 | RpoD | housekeeping |
-
-### 3. Ensure DE output files exist
-
-The pipeline reads from `../caz_kan_DE/`:
-```
-betalactam_primary.csv   ← from deseq2_cazgit.py
-kanamycin_primary.csv    ← from deseq2_kan.py
-```
-Run the DE scripts first if these files are missing.
-
----
-
-## Usage
-
-Run all three steps from inside `network_analysis/`:
+Run commands from the repository root. Install the network-specific runtime:
 
 ```bash
-cd network_analysis/
-
-# Step 1: parse RegulonDB + build graph
-python build_network.py --top-n 50 --min-fc 2.0
-
-# Step 2: score regulators and annotate candidates
-python score_candidates.py
-
-# Step 3: visualise (opens browser)
-python visualize_network.py --open
+python -m pip install -r network_analysis/requirements.txt
 ```
 
-### Key parameters
+Copy `config/network_assets.example.json` to `config/network_assets.json` and
+replace every owner-supplied value. The manifest is deliberately explicit and
+must record, for each asset: URL, local path, exact version, official release
+revision, retrieval date, SHA256, license, and citation. The setup validator
+requires:
 
-| Flag | Script | Default | Effect |
-|------|--------|---------|--------|
-| `--top-n` | build | 50 | Keep top-N candidates per class by log₂FC |
-| `--min-fc` | build | 2.0 | Hard FC floor (2.0 = primary candidates only) |
-| `--min-tf-degree` | build | 1 | Min candidates a regulator must touch to be included |
-| `--min-confidence` | build | `W` | RegulonDB evidence floor: `C` > `S` > `W`. Raise to `S` for stricter, cloning-grade evidence only |
-| `--no-effectors` | build | off | Drop small-molecule effectors (e.g. ppGpp) — keep only TF/sigma binding sites |
-| `--cross-threshold` | score | 0.25 | Specificity margin to flag a regulator as cross-reactive |
-| `--open` | viz | off | Auto-open HTML in browser after export |
+- RegulonDB `>= 14.5.0` for both regulator/sigma flat files and the matching
+  K-12 identity mapping. A preamble declaring `14.5` is normalized to
+  `14.5.0`.
+- An owner-identified iModulon/PRECISE product whose exact release/version is
+  `>= 2.5.0`, plus its companion gene-expression matrix from the same release.
+  The model and expression assets must have matching `version` and `asset_id`.
+  The public [iModulonDB update page](https://imodulondb.org/updates) describes a Version 2.5.0 database release;
+  if that is the intended source, record it explicitly as an `imodulondb` asset
+  and provide the corresponding downloadable model/activity and expression
+  artifacts rather than silently treating the legacy PRECISE-1K JSON as that
+  release.
 
-### Recommended first run
+The second requirement is not a claim that `pymodulon` itself has a 2.5.0
+package release. `pymodulon==0.2.1` is the compatibility runtime used by the
+recovered loader; the data-product identifier must be supplied by the data
+owner. The script fails rather than guessing a provider or substituting an
+unrelated package version.
+
+Validate an already downloaded set, or download missing files from explicit
+manifest URLs:
 
 ```bash
-# Compact, cloning-grade view: strong+confirmed evidence only, top 30 per class
-python build_network.py --top-n 30 --min-tf-degree 2 --min-confidence S
-python score_candidates.py
-python visualize_network.py --open
+python network_analysis/setup_data.py --manifest config/network_assets.json
+python network_analysis/setup_data.py --manifest config/network_assets.json --download
 ```
 
----
+The identity mapping is not optional scientifically for b-number/probe inputs:
+pass the same-release mapping TSV/CSV with `--mapping`. Without it the loader
+retains the source identifier and adds `identity_mapping_not_verified`; those
+nodes may not join RegulonDB symbols.
 
-## Output files
+## Build and candidate-direction policy
 
-```
-output/
-  regulatory_network.pkl       # networkx DiGraph (for downstream use)
-  node_table.csv                # flat node attribute table
-  tf_specificity_scores.csv     # per-regulator class specificity + candidate counts
-  annotated_candidates.csv      # candidates with regulatory flags
-  scoring_summary.txt           # printed summary report
-  regulatory_network.html       # interactive pyvis visualisation
-```
+The builder reads every configured `data/<dataset>/standardized/de_results.csv`
+and retains all rows as provenance. Candidate seeding is selectable:
 
-### Key columns in `annotated_candidates.csv`
+```bash
+python network_analysis/build_network.py \
+  --regulator data/network_regulator_gene.tsv \
+  --sigma data/network_sigma_gene.tsv \
+  --mapping data/network_gene_mapping.tsv \
+  --candidate-direction upregulated
 
-| Column | Description |
-|--------|-------------|
-| `gene` | Gene symbol (lowercase) |
-| `group` | `caz` / `kan` / `cross` |
-| `fc_caz` / `fc_kan` | log₂FC values |
-| `regulators` | Comma-sep list of all regulators touching this gene |
-| `best_tf` | Most class-specific regulator among them |
-| `best_tf_type` | `TF` / `sigma` / `effector` — whether `best_tf` has a discrete, clonable DNA binding site (TF/sigma) or is a small molecule acting on RNAP globally (effector, e.g. ppGpp) |
-| `best_tf_spec` | That regulator's specificity score (0–1) |
-| `has_cross_reactive_regulator` | True if any regulator is cross-reactive |
-| `regulatory_clarity` | Composite score (0–1); higher = better reporter |
-| `biosensor_flag` | ✓ recommended / ⊙ possible / ✗ avoid / ? unknown |
-| `note` | Flags effector-only regulation, or "no regulator in RegulonDB" |
-
-### Key columns in `tf_specificity_scores.csv`
-
-| Column | Description |
-|--------|-------------|
-| `tf` | Regulator name |
-| `regulator_type` | `TF` / `sigma` / `effector` |
-| `specificity_caz` / `specificity_kan` | Fraction of targets in each DE class |
-| `is_cross_reactive` | True if this regulator touches both classes |
-| `dominant_class` | `beta-lactam` / `aminoglycoside` / `mixed` |
-
----
-
-## Visual encoding (regulatory_network.html)
-
-- **Node colour**: beta-lactam (coral) / aminoglycoside (teal) / cross-reactive (purple) / regulator (grey)
-- **Node shape**: ellipse with plain border = TF · ellipse with dashed border = sigma factor · diamond = small-molecule effector
-- **Edge style**: solid green = activates · dashed red = represses · dashed orange = dual
-- **Hover tooltip**: full regulatory detail including RegulonDB confidence level
-
----
-
-## Known limitations
-
-- **RegulonDB coverage is uneven.** Well-studied regulators (LexA, CpxR) have
-  many annotated targets; genes like `dgcZ` may have no regulator annotated in
-  v12 at all. A `biosensor_flag = ?` means "not absent — just uncharacterised",
-  not "ruled out".
-
-- **Small-molecule effectors are real regulatory information, but not clonable
-  the same way.** ~300 of the 319 distinct regulators in `NetworkRegulatorGene.tsv`
-  have no encoding gene (e.g. ppGpp, the stringent-response alarmone) — they act
-  directly on RNA polymerase rather than via a discrete DNA binding site. The
-  pipeline keeps these by default (they're scientifically informative — e.g. a
-  ppGpp connection to a candidate hints at a stringent-response/translational-
-  stress link relevant to aminoglycosides) but flags them via `regulator_type`
-  and a caveat note, since they can't be cloned as an isolated promoter element
-  the way a TF or sigma binding site can. Use `--no-effectors` to exclude them
-  entirely if you only want clonable candidates in the graph.
-
-- **The 896-gene kanamycin list.** `--top-n 50` is the default to keep the
-  graph legible. Lower `--min-fc` or raise `--top-n` to explore more candidates,
-  but the visualisation becomes a hairball above ~150 nodes.
-
-- **Confidence levels matter for cloning decisions.** A `W` (weak)-confidence
-  interaction is still curated evidence, but `--min-confidence S` is worth
-  trying once you're narrowing toward an actual cloning shortlist.
-
----
-
-## Extending the pipeline
-
-The pickled networkx graph is the stable interchange format. Future extensions
-can load it directly:
-
-```python
-import pickle, networkx as nx
-G = pickle.load(open('output/regulatory_network.pkl', 'rb'))
+python network_analysis/build_network.py \
+  --regulator data/network_regulator_gene.tsv \
+  --sigma data/network_sigma_gene.tsv \
+  --mapping data/network_gene_mapping.tsv \
+  --candidate-direction either-direction
 ```
 
-Planned next steps (see project Notion):
-- **iModulon integration** via `pymodulon`: add iModulon membership as a node
-  attribute and co-module membership as a second edge type.
-- **Evo 2 likelihood scoring**: add as an additional column in
-  `annotated_candidates.csv` once the candidate list is narrowed.
-- **Promoter sequence retrieval**: fetch TSS coordinates and -10/-35 elements
-  from RegulonDB's PromoterSet download for candidates flagged ✓.
+`upregulated` is the default and seeds a gene if it is significant and
+upregulated in any dataset. `either-direction` seeds on significant induction
+or repression. Both modes retain the opposite-direction observations as
+evidence; significant opposing directions are marked `conflicted` and never
+count as corroboration.
+
+Evidence tiers are transparent labels, not weighted scores:
+
+1. `conflicted` — significant opposing directions are present;
+2. `limited` — the only qualifying dataset is tobramycin;
+3. `corroborated` — direction-consistent significant evidence covers every
+   configured dataset in at least one class;
+4. `supported` — other qualifying evidence.
+
+The graph stores objective dataset counts, support fractions, per-class tiers,
+source row IDs, padj source, identity source, and caveats. Its class keys are
+`beta_lactam`, `aminoglycoside`, `cross`, and `tf`. Regulatory edges use
+`activates`, `represses`, or `dual`; iModulon co-membership edges use
+`co-imodulon` and are never scored as regulators.
+
+## iModulon/PRECISE annotation
+
+The annotation stage requires both a model and the companion expression matrix:
+
+```bash
+python network_analysis/i_modulon_analysis.py \
+  --graph network_analysis/output/regulatory_network.pkl \
+  --precise data/imodulon/model.json.gz \
+  --expression data/imodulon/expression.csv.gz \
+  --mapping data/network_gene_mapping.tsv
+```
+
+For each candidate it preserves two separate evidence families:
+
+- `gene_expression`: basal, induced, delta, per-background values/counts,
+  units, normalization, availability, and within-class basal/induced
+  percentiles from the companion matrix;
+- `imodulon_activity`: the same basal/induced/delta structure from `ica.A`.
+
+It also retains all weighted iModulon memberships, identifies the primary
+iModulon separately, and reports `metabolic_burden_proxy` and
+`translation_burden_proxy` with their system-category/iModulon basis. Lower
+proxy values are preferable, but these are heuristic screening indicators.
+
+## Score and visualize
+
+```bash
+python network_analysis/score_candidates.py
+python network_analysis/visualize_network.py
+```
+
+The scorer filters predecessors by `node_type=regulator` and the three
+regulatory edge types before computing class specificity. The visualizer
+escapes all tooltip values and exposes evidence tiers, per-dataset evidence,
+expression, activity, caveats, and burden proxies. Generated files belong in
+the ignored `network_analysis/output/` directory and should not be committed.
