@@ -48,29 +48,29 @@
       "name": "precise1k_model",
       "kind": "imodulon",
       "provider": "http",
-      "url": "https://raw.githubusercontent.com/SBRG/precise1k/v1.0/data/precise1k/precise1k.json.gz",
+      "url": "https://raw.githubusercontent.com/SBRG/precise1k/4829b83ace51ee7980de6950077f1cf8f3746f88/data/precise1k/precise1k.json.gz",
       "path": "data/precise1k/model.json.gz",
       "dataset": "PRECISE-1K",
       "dataset_release": "1.0",
-      "source_revision": "v1.0",
+      "source_revision": "4829b83ace51ee7980de6950077f1cf8f3746f88",
       "license": "MIT (source repository; confirm data-use terms)",
       "citation": "Lamoureux et al. PRECISE-1K publication",
-      "asset_id": "precise1k-v1.0"
+      "asset_id": "precise1k-4829b83"
     },
     {
       "name": "precise1k_expression",
       "kind": "expression",
       "provider": "http",
-      "url": "https://raw.githubusercontent.com/SBRG/precise1k/v1.0/data/precise1k/log_tpm_qc.csv",
+      "url": "https://raw.githubusercontent.com/SBRG/precise1k/4829b83ace51ee7980de6950077f1cf8f3746f88/data/precise1k/log_tpm_qc.csv",
       "path": "data/precise1k/expression.csv",
       "dataset": "PRECISE-1K",
       "dataset_release": "1.0",
-      "source_revision": "v1.0",
+      "source_revision": "4829b83ace51ee7980de6950077f1cf8f3746f88",
       "units": "log2(TPM)",
       "normalization": "quality-controlled, uncentered PRECISE-1K expression",
       "license": "MIT (source repository; confirm data-use terms)",
       "citation": "Lamoureux et al. PRECISE-1K publication",
-      "asset_id": "precise1k-v1.0"
+      "asset_id": "precise1k-4829b83"
     }
   ]
 }
