@@ -15,36 +15,43 @@ python -m pip install -r network_analysis/requirements.txt
 ```
 
 Copy `config/network_assets.example.json` to `config/network_assets.json` and
-replace every owner-supplied value. The manifest is deliberately explicit and
-must record, for each asset: URL, local path, exact version, official release
-revision, retrieval date, SHA256, license, and citation. The setup validator
-requires:
+review the provider, release, license, and citation metadata. The source
+manifest records where each asset comes from; `setup_data.py --download`
+generates `config/network_assets.lock.json` with the exact retrieved bytes,
+release metadata, upstream IDs, sizes, retrieval times, and SHA256 values.
+Hashes do not need to be captured manually before the first download.
 
-- RegulonDB `>= 14.5.0` for both regulator/sigma flat files and the matching
-  K-12 identity mapping. A preamble declaring `14.5` is normalized to
-  `14.5.0`.
-- An owner-identified iModulon/PRECISE product whose exact release/version is
-  `>= 2.5.0`, plus its companion gene-expression matrix from the same release.
-  The model and expression assets must have matching `version` and `asset_id`.
-  The public [iModulonDB update page](https://imodulondb.org/updates) describes a Version 2.5.0 database release;
-  if that is the intended source, record it explicitly as an `imodulondb` asset
-  and provide the corresponding downloadable model/activity and expression
-  artifacts rather than silently treating the legacy PRECISE-1K JSON as that
-  release.
+The setup validator requires:
 
-The second requirement is not a claim that `pymodulon` itself has a 2.5.0
-package release. `pymodulon==0.2.1` is the compatibility runtime used by the
-recovered loader; the data-product identifier must be supplied by the data
-owner. The script fails rather than guessing a provider or substituting an
-unrelated package version.
+- RegulonDB `>= 14.5.0` for regulator, sigma, and identity products. The
+  default GraphQL provider queries `getDatabaseInfo`, `listAllFileNames`, and
+  `getDataOfFile`; its endpoint is configurable because the documented host is
+  currently a prerelease host.
+- PRECISE-1K dataset release `>= 1.0`, with the model and companion expression
+  file pinned to the same source revision. The iModulonDB Version 2.5.0
+  platform release is recorded as contextual catalog provenance, not confused
+  with the PRECISE-1K dataset release.
 
-Validate an already downloaded set, or download missing files from explicit
-manifest URLs:
+`pymodulon==0.2.1` is the compatibility runtime used by the recovered loader.
+The model supplies iModulon matrices and metadata; gene-level expression is
+loaded from `IcaData.log_tpm`, then a documented `IcaData.X`, then the
+companion expression file.
+
+Download missing files and generate the lock, verify an existing checkout, or
+explicitly accept changed upstream bytes:
 
 ```bash
-python network_analysis/setup_data.py --manifest config/network_assets.json
 python network_analysis/setup_data.py --manifest config/network_assets.json --download
+python network_analysis/setup_data.py --manifest config/network_assets.json
+python network_analysis/setup_data.py --manifest config/network_assets.json --download --refresh-lock
 ```
+
+For an offline checkout, retain both the downloaded files and the lock. The
+validator never silently accepts a changed cached file.
+
+The downloader verifies HTTPS certificates. In a managed environment with a
+private certificate authority, point `SSL_CERT_FILE` at the organization’s CA
+bundle; do not disable certificate verification.
 
 The identity mapping is not optional scientifically for b-number/probe inputs:
 pass the same-release mapping TSV/CSV with `--mapping`. Without it the loader
@@ -92,15 +99,23 @@ source row IDs, padj source, identity source, and caveats. Its class keys are
 
 ## iModulon/PRECISE annotation
 
-The annotation stage requires both a model and the companion expression matrix:
+The annotation stage accepts embedded gene expression when available and falls
+back to the companion expression matrix:
 
 ```bash
 python network_analysis/i_modulon_analysis.py \
   --graph network_analysis/output/regulatory_network.pkl \
-  --precise data/imodulon/model.json.gz \
-  --expression data/imodulon/expression.csv.gz \
-  --mapping data/network_gene_mapping.tsv
+  --precise data/precise1k/model.json.gz \
+  --expression data/precise1k/expression.csv \
+  --mapping data/network_gene_mapping.tsv \
+  --expression-units 'log2(TPM)' \
+  --expression-normalization 'quality-controlled, uncentered PRECISE-1K expression'
 ```
+
+`--expression` is optional when the serialized `IcaData` contains a usable
+gene-level `log_tpm` or `X` matrix. It remains required for the selected
+PRECISE-1K model because that artifact does not contain gene-level expression.
+`ica.A` is iModulon activity, not gene expression.
 
 For each candidate it preserves two separate evidence families:
 
