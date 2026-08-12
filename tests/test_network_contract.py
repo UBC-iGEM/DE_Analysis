@@ -168,6 +168,7 @@ def test_graphql_download_writes_raw_products_lock_and_mapping(tmp_path: Path, m
     ])
     lock = setup_data.download_assets(manifest, tmp_path, lock_path)
     assert lock["assets"]["reg"]["remote_id"] == "r1"
+    assert lock["assets"]["reg"]["source_url"] == "https://example.test/graphql"
     assert (tmp_path / "data/network_gene_mapping.tsv").exists()
     assert "b4053" in (tmp_path / "data/network_gene_mapping.tsv").read_text(encoding="utf-8")
     assert not validate_manifest(manifest, tmp_path, lock=lock, require_lock=True)

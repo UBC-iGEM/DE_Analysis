@@ -318,7 +318,13 @@ def download_assets(manifest: dict[str, Any], root: str | Path | None = None, lo
                 if not isinstance(remote, dict) or remote.get("fileName") != asset["remote_name"] or not isinstance(remote.get("content"), str):
                     raise ValueError(f"RegulonDB GraphQL returned malformed product for {asset['name']}")
                 _atomic_write_bytes(destination, remote["content"].encode("utf-8"))
-                extra = {"remote_name": remote.get("fileName"), "remote_id": remote.get("_id"), "columns_details": remote.get("columnsDetails"), "regulondb_release": release}
+                extra = {
+                    "source_url": context["endpoint"],
+                    "remote_name": remote.get("fileName"),
+                    "remote_id": remote.get("_id"),
+                    "columns_details": remote.get("columnsDetails"),
+                    "regulondb_release": release,
+                }
             else:
                 url = str(asset["url"])
                 print(f"[setup] downloading {asset['name']} -> {destination}")
