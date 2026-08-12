@@ -168,7 +168,11 @@ def load_identity_mapping(path: str | Path | None) -> dict[str, tuple[str, str]]
     for _, row in frame.iterrows():
         gene = _first_value(row, gene_columns)
         locus = _first_value(row, locus_columns)
-        aliases = {_clean(row[column]) for column in alias_columns if column in row and _clean(row[column])}
+        aliases: set[str] = set()
+        for column in alias_columns:
+            if column not in row or not _clean(row[column]):
+                continue
+            aliases.update(_clean(part) for part in re.split(r"[|;,]", str(row[column])) if _clean(part))
         aliases.update({gene, locus})
         aliases.discard("")
         if not gene and locus:
@@ -406,8 +410,8 @@ def aggregate_candidate_evidence(observations: pd.DataFrame, config: dict[str, A
         )
     result = pd.DataFrame(rows)
     if not result.empty:
-        result["candidate_direction_policy"] = observations["is_qualifying_direction"].attrs.get(
-            "candidate_direction_policy", "configured"
+        result["candidate_direction_policy"] = observations.attrs.get(
+            "candidate_direction_policy", "upregulated"
         )
     return result
 

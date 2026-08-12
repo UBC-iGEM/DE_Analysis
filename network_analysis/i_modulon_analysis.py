@@ -2,7 +2,8 @@
 
 The module keeps two evidence families separate:
 
-* candidate-gene expression from the companion PRECISE expression matrix;
+* candidate-gene expression from ``IcaData.log_tpm``, ``IcaData.X``, or a
+  companion PRECISE expression matrix;
 * primary iModulon activity from ``IcaData.A``.
 
 Both retain basal, induced, delta, per-background counts, units, and
@@ -68,7 +69,7 @@ def load_precise_model(path: str | Path) -> IcaData:
         serial = json.load(handle)
     cutoff_optimized = serial.pop("_cutoff_optimized", False)
     dagostino_cutoff = serial.pop("_dagostino_cutoff", None)
-    for key in ("M", "A", "gene_table", "sample_table", "imodulon_table", "trn"):
+    for key in ("M", "A", "X", "log_tpm", "gene_table", "sample_table", "imodulon_table", "trn"):
         if key in serial and serial[key] is not None:
             serial[key] = _read_json_table(serial[key])
     original_astype = pd.Index.astype
@@ -227,17 +228,68 @@ def compute_dynamic_range(ica: IcaData, condition_groups: dict[str, dict[str, An
     return result
 
 
-def load_expression_matrix(path: str | Path, gene_id_column: str | None = None) -> tuple[pd.DataFrame, dict[str, str]]:
+def _prepare_expression_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    frame = frame.copy()
+    frame.index = frame.index.astype(str).str.strip().str.lower()
+    frame.columns = [str(column).strip() for column in frame.columns]
+    return frame.apply(pd.to_numeric, errors="coerce")
+
+
+def load_expression_matrix(
+    path: str | Path,
+    gene_id_column: str | None = None,
+    units: str = "unknown",
+    normalization: str = "provided",
+) -> tuple[pd.DataFrame, dict[str, str]]:
     """Load the companion expression matrix (rows genes, columns PRECISE samples)."""
 
     frame = pd.read_csv(path, sep=None, engine="python")
     frame.columns = [str(column).strip() for column in frame.columns]
     id_column = gene_id_column or next((c for c in frame.columns if c.lower() in {"gene", "gene_id", "locus_tag", "b_number"}), frame.columns[0])
     frame = frame.set_index(id_column)
-    frame.index = frame.index.astype(str).str.strip().str.lower()
-    frame = frame.apply(pd.to_numeric, errors="coerce")
-    metadata = {"units": "unknown", "normalization": "provided", "gene_id_column": id_column}
+    frame = _prepare_expression_frame(frame)
+    metadata = {"units": units, "normalization": normalization, "gene_id_column": id_column, "source": str(path)}
     return frame, metadata
+
+
+def load_embedded_expression(ica: IcaData) -> tuple[pd.DataFrame | None, dict[str, str]]:
+    """Prefer gene-level expression embedded in an IcaData object.
+
+    ``A`` is intentionally excluded: it contains iModulon activities rather
+    than gene-level expression.  ``X`` is accepted only as a fallback because
+    its centered-expression semantics vary by dataset.
+    """
+
+    for attribute, units, normalization in (
+        ("log_tpm", "log2(TPM)", "embedded log2(TPM)"),
+        ("X", "unknown", "embedded centered expression; verify source semantics"),
+    ):
+        value = getattr(ica, attribute, None)
+        if value is None:
+            continue
+        frame = value if isinstance(value, pd.DataFrame) else pd.DataFrame(value)
+        if frame.empty:
+            continue
+        return _prepare_expression_frame(frame), {
+            "units": units,
+            "normalization": normalization,
+            "source": f"IcaData.{attribute}",
+            "gene_id_column": "index",
+        }
+    return None, {"units": "unknown", "normalization": "unavailable", "source": "unavailable", "gene_id_column": "index"}
+
+
+def validate_expression_alignment(expression: pd.DataFrame, ica: IcaData) -> None:
+    """Reject an expression matrix that cannot support the model's evidence."""
+
+    model_samples = {str(value).strip() for value in ica.A.columns}
+    expression_samples = {str(value).strip() for value in expression.columns}
+    if not model_samples.intersection(expression_samples):
+        raise ValueError("Expression matrix has no sample IDs overlapping IcaData.A")
+    model_genes = {str(value).strip().lower() for value in ica.M.index}
+    expression_genes = {str(value).strip().lower() for value in expression.index}
+    if not model_genes.intersection(expression_genes):
+        raise ValueError("Expression matrix has no gene IDs overlapping IcaData.M")
 
 
 def compute_gene_expression_evidence(
@@ -467,12 +519,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--graph", default=root / "network_analysis" / "output" / "regulatory_network.pkl")
     parser.add_argument("--precise", required=True, help="PRECISE/iModulon model JSON.GZ")
-    parser.add_argument("--expression", required=True, help="Same-release companion expression matrix")
+    parser.add_argument("--expression", default=None, help="Optional same-release companion expression matrix; embedded log_tpm/X is preferred when available")
     parser.add_argument("--mapping", default=None, help="Same-release gene/locus mapping")
     parser.add_argument("--out", default=root / "network_analysis" / "output")
     parser.add_argument("--out-graph", default=None)
-    parser.add_argument("--expression-units", default="unknown")
-    parser.add_argument("--expression-normalization", default="provided")
+    parser.add_argument("--expression-units", default=None)
+    parser.add_argument("--expression-normalization", default=None)
     parser.add_argument("--fdr", type=float, default=0.01)
     parser.add_argument("--max-regs", type=int, default=1)
     parser.add_argument("--method", choices=["and", "or", "both"], default="both")
@@ -482,12 +534,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    for path, label in ((args.graph, "--graph"), (args.precise, "--precise"), (args.expression, "--expression")):
+    for path, label in ((args.graph, "--graph"), (args.precise, "--precise")):
         if not Path(path).exists():
             raise FileNotFoundError(f"{label} file not found: {path}")
+    if args.expression and not Path(args.expression).exists():
+        raise FileNotFoundError(f"--expression file not found: {args.expression}")
     graph = pickle.loads(Path(args.graph).read_bytes())
     ica = load_precise_model(args.precise)
-    expression, metadata = load_expression_matrix(args.expression)
+    if args.expression:
+        expression, metadata = load_expression_matrix(
+            args.expression,
+            units=args.expression_units or "unknown",
+            normalization=args.expression_normalization or "provided",
+        )
+    else:
+        expression, metadata = load_embedded_expression(ica)
+    if expression is None:
+        raise ValueError(
+            "No gene-level expression is available: provide --expression or use an IcaData model containing log_tpm/X"
+        )
+    validate_expression_alignment(expression, ica)
     mapping = load_gene_mapping(args.mapping)
     lookup = build_gene_lookup(ica, mapping)
     membership, members_by_imodulon = build_membership_tables(ica)
@@ -500,6 +566,7 @@ def main(argv: list[str] | None = None) -> None:
     graph_path = args.out_graph or str(Path(args.out) / "regulatory_network_imodulon.pkl")
     save_outputs(graph, candidates, enrichment, args.out, graph_path, discovered,
                  [f"candidate nodes: {len(candidates)}", f"co-iModulon edges: {co_edges}",
+                  f"Expression source: {metadata['source']} ({metadata['units']}; {metadata['normalization']})",
                   "Expression and activity values are evidence proxies; burden proxies are heuristic and lower is preferable."])
 
 

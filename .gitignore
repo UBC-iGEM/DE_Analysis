@@ -1,4 +1,9 @@
 outputs/
+data/network_regulator_gene.tsv
+data/network_sigma_gene.tsv
+data/network_gene_mapping.tsv
+data/regulondb/
+data/precise1k/
 **/__pycache__/
 .pytest_cache/
 .mypy_cache/

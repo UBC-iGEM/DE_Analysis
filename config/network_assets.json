@@ -20,7 +20,7 @@
       "remote_name": "NetworkRegulatorGene",
       "path": "data/network_regulator_gene.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation",
+      "citation": "RegulonDB release citation; see https://regulondb.ccg.unam.mx/",
       "asset_id": "NetworkRegulatorGene"
     },
     {
@@ -30,7 +30,7 @@
       "remote_name": "NetworkSigmaGene",
       "path": "data/network_sigma_gene.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation",
+      "citation": "RegulonDB release citation; see https://regulondb.ccg.unam.mx/",
       "asset_id": "NetworkSigmaGene"
     },
     {
@@ -40,8 +40,8 @@
       "remote_name": "GeneProductAllIdentifiersSet",
       "path": "data/regulondb/GeneProductAllIdentifiersSet.tsv",
       "derived_path": "data/network_gene_mapping.tsv",
-      "license": "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)",
-      "citation": "RegulonDB release citation",
+      "license": "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0); https://creativecommons.org/licenses/by-nc/4.0/",
+      "citation": "Santos-Zavaleta A. et al. RegulonDB v12.0: updated transcriptional regulation database for Escherichia coli K-12. Nucleic Acids Res. 2024.",
       "asset_id": "GeneProductAllIdentifiersSet"
     },
     {
@@ -54,7 +54,7 @@
       "dataset_release": "1.0",
       "source_revision": "v1.0",
       "license": "MIT (source repository; confirm data-use terms)",
-      "citation": "Lamoureux et al. PRECISE-1K publication",
+      "citation": "Lamoureux C. R. et al. A multi-scale expression and regulation knowledge base for Escherichia coli. Nucleic Acids Res. 2023;51(19):10176-10193. DOI:10.1093/nar/gkad750",
       "asset_id": "precise1k-v1.0"
     },
     {
@@ -69,7 +69,7 @@
       "units": "log2(TPM)",
       "normalization": "quality-controlled, uncentered PRECISE-1K expression",
       "license": "MIT (source repository; confirm data-use terms)",
-      "citation": "Lamoureux et al. PRECISE-1K publication",
+      "citation": "Lamoureux C. R. et al. A multi-scale expression and regulation knowledge base for Escherichia coli. Nucleic Acids Res. 2023;51(19):10176-10193. DOI:10.1093/nar/gkad750",
       "asset_id": "precise1k-v1.0"
     }
   ]
