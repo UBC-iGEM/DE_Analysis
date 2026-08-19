@@ -12,14 +12,18 @@ from typing import Any
 import networkx as nx
 
 try:
+    from .dataset_registry import CLASS_REGISTRY
+except ImportError:  # pragma: no cover
+    from dataset_registry import CLASS_REGISTRY  # type: ignore
+
+try:
     from pyvis.network import Network
 except ImportError:  # pragma: no cover - gives a clear CLI error
     Network = None  # type: ignore[assignment,misc]
 
 
 COLORS = {
-    "beta_lactam": "#2b6cb0",
-    "aminoglycoside": "#c05621",
+    **{class_key: specification["color"] for class_key, specification in CLASS_REGISTRY.items()},
     "cross": "#805ad5",
     "tf": "#4a5568",
 }

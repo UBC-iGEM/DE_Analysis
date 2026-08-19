@@ -13,14 +13,35 @@ from typing import Any
 
 
 CLASS_REGISTRY: dict[str, dict[str, Any]] = {
-    "beta_lactam": {"label": "Beta-lactam", "datasets": ("amoxicillin", "ceftazidime")},
-    "aminoglycoside": {"label": "Aminoglycoside", "datasets": ("gentamicin", "tobramycin")},
+    "beta_lactam": {
+        "label": "Beta-lactam",
+        "color": "#2b6cb0",
+        "condition_keywords": ("cef", "mero", "imipenem", "ampicillin", "amoxicillin", "penicillin"),
+    },
+    "aminoglycoside": {
+        "label": "Aminoglycoside",
+        "color": "#c05621",
+        "condition_keywords": ("kan", "tobramycin", "gentamicin", "amikacin", "streptomycin"),
+    },
+    "fluoroquinolone": {
+        "label": "Fluoroquinolone",
+        "color": "#2f855a",
+        "condition_keywords": ("cipro", "ciprofloxacin"),
+    },
+    "polymyxin": {
+        "label": "Polymyxin",
+        "color": "#b7791f",
+        "condition_keywords": ("polymyxin", "polymixin", "colistin"),
+    },
 }
 
 DATASET_CAVEATS: dict[str, str] = {
     "amoxicillin": "Resistant-mutant/fluoxetine comparison; not a direct wild-type antibiotic exposure.",
     "ceftazidime": "Gene identifiers are supplied as b-number locus tags and require same-release mapping.",
     "gentamicin": "Probe-to-gene annotation contains duplicate symbols; collapse is deterministic and provenance-preserving.",
+    "kanamycin": "GSE220559 processed count-table comparison; gene identifiers are supplied as b-number locus tags and require same-release mapping.",
+    "ciprofloxacin": "GSE220559 processed count-table comparison; gene identifiers are supplied as b-number locus tags and require same-release mapping.",
+    "polymixinE": "GSE220559 processed count-table comparison; gene identifiers are supplied as b-number locus tags and require same-release mapping.",
     "tobramycin": "Independent aminoglycoside dataset; evidence is limited when this is the only qualifying dataset.",
 }
 

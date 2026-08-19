@@ -18,11 +18,13 @@ import pandas as pd
 
 try:
     from .build_network import REGULATORY_EDGE_TYPES
+    from .dataset_registry import CLASS_REGISTRY
 except ImportError:  # pragma: no cover
     from build_network import REGULATORY_EDGE_TYPES  # type: ignore
+    from dataset_registry import CLASS_REGISTRY  # type: ignore
 
 
-CLASS_KEYS = ("beta_lactam", "aminoglycoside")
+CLASS_KEYS = tuple(CLASS_REGISTRY)
 TIER_ORDER = {"conflicted": 0, "limited": 1, "supported": 2, "corroborated": 3}
 
 
@@ -66,22 +68,24 @@ def compute_tf_specificity(graph: nx.DiGraph) -> pd.DataFrame:
         if not targets:
             continue
         total = len(targets)
-        beta_count = class_counts["beta_lactam"]
-        amino_count = class_counts["aminoglycoside"]
-        rows.append({
+        row = {
             "regulator": regulator,
             "regulator_type": data.get("regulator_type", "unknown"),
-            "n_beta_lactam_targets": beta_count,
-            "n_aminoglycoside_targets": amino_count,
             "n_total_targets": total,
-            "specificity_beta_lactam": round(beta_count / total, 3),
-            "specificity_aminoglycoside": round(amino_count / total, 3),
-            "is_cross_reactive": beta_count > 0 and amino_count > 0,
-            "dominant_class": "beta_lactam" if beta_count > amino_count else "aminoglycoside" if amino_count > beta_count else "mixed",
             "target_genes": ", ".join(sorted(set(targets))),
-        })
-    columns = ["regulator", "regulator_type", "n_beta_lactam_targets", "n_aminoglycoside_targets",
-               "n_total_targets", "specificity_beta_lactam", "specificity_aminoglycoside",
+        }
+        for class_key in CLASS_KEYS:
+            row[f"n_{class_key}_targets"] = class_counts[class_key]
+            row[f"specificity_{class_key}"] = round(class_counts[class_key] / total, 3)
+        nonzero_classes = [class_key for class_key in CLASS_KEYS if class_counts[class_key] > 0]
+        max_count = max(class_counts.values())
+        dominant = [class_key for class_key in CLASS_KEYS if class_counts[class_key] == max_count]
+        row["is_cross_reactive"] = len(nonzero_classes) > 1
+        row["dominant_class"] = dominant[0] if len(dominant) == 1 else "mixed"
+        rows.append(row)
+    count_columns = [f"n_{class_key}_targets" for class_key in CLASS_KEYS]
+    specificity_columns = [f"specificity_{class_key}" for class_key in CLASS_KEYS]
+    columns = ["regulator", "regulator_type", *count_columns, "n_total_targets", *specificity_columns,
                "is_cross_reactive", "dominant_class", "target_genes"]
     return pd.DataFrame(rows, columns=columns).sort_values("n_total_targets", ascending=False, ignore_index=True)
 

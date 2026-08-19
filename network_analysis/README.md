@@ -92,8 +92,12 @@ Evidence tiers are transparent labels, not weighted scores:
 4. `supported` — other qualifying evidence.
 
 The graph stores objective dataset counts, support fractions, per-class tiers,
-source row IDs, padj source, identity source, and caveats. Its class keys are
-`beta_lactam`, `aminoglycoside`, `cross`, and `tf`. Regulatory edges use
+source row IDs, padj source, identity source, and caveats. Supported class keys
+are `beta_lactam`, `aminoglycoside`, `fluoroquinolone`, `polymyxin`, `cross`,
+and `tf`; a duplicate dataset name is rejected to prevent double-counting.
+PRECISE-1K has matched ciprofloxacin/control samples, but the selected model
+does not provide matched polymyxin samples, so polymyxin expression/activity
+fields remain unavailable rather than being inferred. Regulatory edges use
 `activates`, `represses`, or `dual`; iModulon co-membership edges use
 `co-imodulon` and are never scored as regulators.
 

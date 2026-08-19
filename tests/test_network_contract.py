@@ -68,6 +68,44 @@ def test_co_imodulon_edges_do_not_score_as_regulators():
     assert annotated.set_index("gene").loc["geneb", "regulators"] == ""
 
 
+def test_extended_antibiotic_classes_are_supported_and_scored(tmp_path: Path):
+    config = {
+        "thresholds": {"log2_fold_change": 2.0, "padj": 0.05},
+        "datasets": [
+            {"name": "ciprofloxacin", "antibiotic_class": "fluoroquinolone"},
+            {"name": "polymixinE", "antibiotic_class": "polymyxin"},
+        ],
+    }
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    assert load_dataset_config(config_path)["datasets"][0]["antibiotic_class"] == "fluoroquinolone"
+
+    graph = nx.DiGraph()
+    graph.add_node("rpoe", node_type="regulator", group="tf", regulator_type="sigma")
+    graph.add_node("gyrA", node_type="candidate", group="fluoroquinolone", significant_classes=["fluoroquinolone"])
+    graph.add_node("pmrA", node_type="candidate", group="polymyxin", significant_classes=["polymyxin"])
+    graph.add_edge("rpoe", "gyrA", edge_type="activates")
+    graph.add_edge("rpoe", "pmrA", edge_type="activates")
+    scores = compute_tf_specificity(graph)
+    score = scores.iloc[0]
+    assert score["n_fluoroquinolone_targets"] == 1
+    assert score["n_polymyxin_targets"] == 1
+    assert bool(score["is_cross_reactive"])
+
+
+def test_dataset_config_rejects_duplicate_names(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({
+        "thresholds": {"log2_fold_change": 2.0, "padj": 0.05},
+        "datasets": [
+            {"name": "gentamicin", "antibiotic_class": "aminoglycoside"},
+            {"name": "gentamicin", "antibiotic_class": "aminoglycoside"},
+        ],
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="Duplicate dataset name"):
+        load_dataset_config(path)
+
+
 def test_expression_contract_retains_basal_induced_and_backgrounds():
     expression = pd.DataFrame({"ctrl_1": [1.0], "drug_1": [8.0]}, index=["b0001"])
     groups = {"beta_lactam": {"backgrounds": [{"background": "cam", "control": ["ctrl_1"], "treated": ["drug_1"]}]}, "aminoglycoside": {"backgrounds": []}}

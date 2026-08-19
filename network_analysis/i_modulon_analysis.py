@@ -41,8 +41,8 @@ except ImportError:  # pragma: no cover
 
 
 CONDITION_KEYWORDS: dict[str, list[str]] = {
-    "beta_lactam": ["cef", "mero", "imipenem", "ampicillin", "amoxicillin", "penicillin"],
-    "aminoglycoside": ["kan", "tobramycin", "gentamicin", "amikacin", "streptomycin"],
+    class_key: list(specification.get("condition_keywords", ()))
+    for class_key, specification in CLASS_REGISTRY.items()
 }
 CONTROL_TOKEN = "ctrl"
 BURDEN_RISK_SYSTEM_CATEGORIES = {"Metabolism", "Translation"}
