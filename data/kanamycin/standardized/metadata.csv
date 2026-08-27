@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+KAN_2,kanamycin,aminoglycoside,kanamycin,KAN,treated,2,GSM6806878_KAN_2.txt.gz
+KAN_3,kanamycin,aminoglycoside,kanamycin,KAN,treated,3,GSM6806879_KAN_3.txt.gz
+KAN_4,kanamycin,aminoglycoside,kanamycin,KAN,treated,4,GSM6806880_KAN_4.txt.gz
+Wu_2,kanamycin,aminoglycoside,kanamycin,Wu,control,2,GSM6806890_Wu_2.txt.gz
+Wu_3,kanamycin,aminoglycoside,kanamycin,Wu,control,3,GSM6806891_Wu_3.txt.gz
+Wu_4,kanamycin,aminoglycoside,kanamycin,Wu,control,4,GSM6806892_Wu_4.txt.gz

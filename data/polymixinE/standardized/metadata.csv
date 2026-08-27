@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+PME_1,polymixinE,polymyxin,polymixinE,PME,treated,1,GSM6806884_PME_1.txt.gz
+PME_2,polymixinE,polymyxin,polymixinE,PME,treated,2,GSM6806885_PME_2.txt.gz
+PME_3,polymixinE,polymyxin,polymixinE,PME,treated,3,GSM6806886_PME_3.txt.gz
+Wu_2,polymixinE,polymyxin,polymixinE,Wu,control,2,GSM6806890_Wu_2.txt.gz
+Wu_3,polymixinE,polymyxin,polymixinE,Wu,control,3,GSM6806891_Wu_3.txt.gz
+Wu_4,polymixinE,polymyxin,polymixinE,Wu,control,4,GSM6806892_Wu_4.txt.gz

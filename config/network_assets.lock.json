@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-12T03:17:08+00:00",
+  "assets": {
+    "regulondb_regulator_gene": {
+      "path": "data/network_regulator_gene.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb-prerelease.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "b6ff71af23dca45143a751c7b300e5163da38dc3581cae20c58ccb40a9217eb9",
+      "size": 393381,
+      "retrieved_at": "2026-08-12T03:16:57+00:00",
+      "remote_name": "NetworkRegulatorGene",
+      "remote_id": "RDBECOLIDLF00005",
+      "columns_details": "# Columns:\n# (1) regulatorId. Regulator identifier\n# (2) regulatorName. Regulator Name\n# (3) regulatorGeneName. Gene(s) coding for the TF\n# (4) regulatedGeneId. Gene ID regulated by the Regulator (regulated Gene)\n# (5) regulatedGeneName. Gene regulated by the Regulator (regulated Gene)\n# (6) function. Regulatory Function of the Regulator on the regulated Gene (+ activator, - repressor, -+ dual, ? unknown)\n# (7) confidenceLevel. RI confidence level based on its evidence (Values: Confirmed[C], Strong[S], Weak[W], Unknown[?])",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_sigma_gene": {
+      "path": "data/network_sigma_gene.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb-prerelease.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "cc5f9a5cdc4ef6ee7b64091f9ed44140eebfb45e24a99c51e1edac7c54bc4929",
+      "size": 247288,
+      "retrieved_at": "2026-08-12T03:16:58+00:00",
+      "remote_name": "NetworkSigmaGene",
+      "remote_id": "RDBECOLIDLF00018",
+      "columns_details": "# Columns:\n(1) sigmaName. Sigma Name\n# (2) regulatedGeneName. Gene regulated by the Sigma Factor (regulated Gene)\n# (3) function. Regulatory Function of the Sigma on the regulated Gene (+ activator, - repressor, -+ dual, ? unknown)\n# (4)promoterEvidences. Evidence that supports the regulation the sigma on the promoter and the promoter evidences\n# (5) confidenceLevel. RI confidence level based on its evidence (Values: Confirmed[C], Strong[S], Weak[W], Unknown[?])",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_k12_gene_mapping": {
+      "path": "data/regulondb/GeneProductAllIdentifiersSet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb-prerelease.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "772d6d92e8f1e0231e9ce6e53f135f80b4b51524b4bba6762ed70829caf960fb",
+      "size": 2261184,
+      "retrieved_at": "2026-08-12T03:16:59+00:00",
+      "remote_name": "GeneProductAllIdentifiersSet",
+      "remote_id": "RDBECOLIDLF00017",
+      "columns_details": "# Columns:\n# (1) Gene identifier assigned by RegulonDB\n# (2) Gene name\n# (3) Gene left end position in the genome\n# (4) Gene right end position in the genome\n# (5) DNA strand where the gene is coded\n# (6) other gene synonyms\n# (7) Other database's id  related to gene\n# (8) Product identifier of the gene\n# (9) Product name of the gene\n# (10) Other products synonyms\n# (11) Other database's id  related to product",
+      "regulondb_release": "14.5.0"
+    },
+    "precise1k_model": {
+      "path": "data/precise1k/model.json.gz",
+      "provider": "http",
+      "source_url": "https://raw.githubusercontent.com/SBRG/precise1k/4829b83ace51ee7980de6950077f1cf8f3746f88/data/precise1k/precise1k.json.gz",
+      "source_revision": "4829b83ace51ee7980de6950077f1cf8f3746f88",
+      "dataset_release": "1.0",
+      "sha256": "2f5f0e41867fc2121cefdde8aeb4efd545466d35d6ad42b604d402db62d67de9",
+      "size": 12929562,
+      "retrieved_at": "2026-08-12T03:17:02+00:00"
+    },
+    "precise1k_expression": {
+      "path": "data/precise1k/expression.csv",
+      "provider": "http",
+      "source_url": "https://raw.githubusercontent.com/SBRG/precise1k/4829b83ace51ee7980de6950077f1cf8f3746f88/data/precise1k/log_tpm_qc.csv",
+      "source_revision": "4829b83ace51ee7980de6950077f1cf8f3746f88",
+      "dataset_release": "1.0",
+      "sha256": "8bdb286aecd305a38323ad5a5c18eb264702739824dfcb708c5c5b595abb84d6",
+      "size": 60884226,
+      "retrieved_at": "2026-08-12T03:17:08+00:00"
+    },
+    "regulondb_k12_gene_mapping:derived": {
+      "source_asset": "regulondb_k12_gene_mapping",
+      "path": "C:\\Users\\wxie04\\Desktop\\iGEM\\DE_Analysis.worktrees\\network-analysis-multidataset\\data\\network_gene_mapping.tsv",
+      "sha256": "8c3018d8a20e3c8210d2f43a549482c6efedb4cdfe7602630a4f5d6a8ed9c4e2",
+      "size": 392228,
+      "rows": 4759,
+      "source_release": "14.5.0",
+      "retrieved_at": "2026-08-12T03:17:08+00:00"
+    }
+  }
+}

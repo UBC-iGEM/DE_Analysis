@@ -1,0 +1,7 @@
+sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
+CIP_1,ciprofloxacin,fluoroquinolone,ciprofloxacin,CIP,treated,1,GSM6806869_CIP_1.txt.gz
+CIP_2,ciprofloxacin,fluoroquinolone,ciprofloxacin,CIP,treated,2,GSM6806870_CIP_2.txt.gz
+CIP_3,ciprofloxacin,fluoroquinolone,ciprofloxacin,CIP,treated,3,GSM6806871_CIP_3.txt.gz
+Wu_2,ciprofloxacin,fluoroquinolone,ciprofloxacin,Wu,control,2,GSM6806890_Wu_2.txt.gz
+Wu_3,ciprofloxacin,fluoroquinolone,ciprofloxacin,Wu,control,3,GSM6806891_Wu_3.txt.gz
+Wu_4,ciprofloxacin,fluoroquinolone,ciprofloxacin,Wu,control,4,GSM6806892_Wu_4.txt.gz

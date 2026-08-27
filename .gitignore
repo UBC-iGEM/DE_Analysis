@@ -1,5 +1,5 @@
-network_analysis/outputs/
-output/
+network_analysis/output/
+outputs/
 data/network_regulator_gene.tsv
 data/network_sigma_gene.tsv
 data/network_gene_mapping.tsv

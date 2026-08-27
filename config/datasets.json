@@ -61,6 +61,20 @@
       "value_suffix": "readcount"
     },
     {
+      "name": "ciprofloxacin",
+      "antibiotic_class": "fluoroquinolone",
+      "treatment": "ciprofloxacin",
+      "comparison": "ciprofloxacin_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/ciprofloxacin/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>CIP|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": ["Wu"],
+      "treated_groups": ["CIP"],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount"
+    },
+    {
       "name": "gentamicin",
       "antibiotic_class": "aminoglycoside",
       "treatment": "gentamicin",
@@ -79,6 +93,54 @@
         "GSM1080851": "Gentamicin-3"
       },
       "value_scale": "linear"
+    },
+    {
+      "name": "kanamycin",
+      "antibiotic_class": "aminoglycoside",
+      "treatment": "kanamycin",
+      "comparison": "kanamycin_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/ceftazidime/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>KAN|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": ["Wu"],
+      "treated_groups": ["KAN"],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount"
+    },
+    {
+      "name": "gentamicin",
+      "antibiotic_class": "aminoglycoside",
+      "treatment": "gentamicin",
+      "input_type": "series_matrix",
+      "series_matrix": "data/gentamicin/GSE44211_series_matrix.txt.gz",
+      "platform_annotation": "data/gentamicin/GPL3154.annot.gz",
+      "raw_archive": "data/gentamicin/GSE44211_RAW.tar",
+      "control_samples": ["GSM1080843", "GSM1080844", "GSM1080845"],
+      "treated_samples": ["GSM1080849", "GSM1080850", "GSM1080851"],
+      "sample_labels": {
+        "GSM1080843": "Control-1",
+        "GSM1080844": "Control-2",
+        "GSM1080845": "Control-3",
+        "GSM1080849": "Gentamicin-1",
+        "GSM1080850": "Gentamicin-2",
+        "GSM1080851": "Gentamicin-3"
+      },
+      "value_scale": "linear"
+    },
+    {
+      "name": "polymixinE",
+      "antibiotic_class": "polymyxin",
+      "treatment": "polymixinE",
+      "comparison": "polymixinE_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/polymixinE/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>PME|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": ["Wu"],
+      "treated_groups": ["PME"],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount"
     },
     {
       "name": "tobramycin",
