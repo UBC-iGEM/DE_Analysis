@@ -22,7 +22,9 @@ class proxies rather than exact-drug validation.
 
 `references/regulondb/` contains the cached regulator/gene and sigma/gene
 networks, gene identifiers, transcription units, promoter annotations, and the
-derived canonical gene mapping. Their sources and verified hashes are recorded
+derived canonical gene mapping. `RISet.tsv` adds curated regulatory-site positions
+and evidence. `references/ecoli_mg1655/U00096.3.fasta` supplies the accession-pinned
+genome for proposed fragment review. Their sources and verified hashes are recorded
 in [`regulondb_assets.json`](../config/regulondb_assets.json) and
 [`regulondb.lock.json`](../config/regulondb.lock.json).
 

@@ -5,11 +5,12 @@ commands in the [project README](../README.md).
 
 | Folder | Contents |
 | --- | --- |
-| `differential_expression/model/` | Joint sample metadata, normalized counts, common gene filter, direct drug contrasts, and provenance |
-| `differential_expression/contrasts/<treatment>/` | Full-precision matched drug/control DE results, selected raw expression tables, and metadata |
+| `differential_expression/model/` | Joint sample metadata, raw/normalized/variance-stabilized counts, common gene filter, direct drug contrasts, and provenance |
+| `differential_expression/contrasts/<treatment>/` | Full-precision matched drug/control DE results with separate original and shrunken effects, selected raw expression tables, and metadata |
 | `regulatory_network/` | Full curated graph, node/source tables, directional regulon enrichment, coverage, scoring provenance, and interactive HTML |
 | `promoter_candidates/` | `annotated_candidates.csv`, `beta_lactam_candidates.csv`, and `aminoglycoside_candidates.csv` |
 | `promoter_review/` | `candidate_promoter_mapping.csv` and grouped `promoter_review.csv` |
+| `candidate_assessment/` | QC and panel figures, replicate summaries, screening stability, cross-reactivity, operon support, proposed fragments, and `experimental_panel.csv` |
 
 Start with the two class shortlists, then review the promoter table. Class lists
 can overlap. The benchmark uses class proxies for the four wet-lab antibiotics;

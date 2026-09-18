@@ -49,7 +49,7 @@ def assemble_counts(config):
     return counts, metadata
 
 
-def contrast_results(dds, numerator, denominator, config):
+def contrast_results(dds, numerator, denominator, config, shrink=False):
     from pydeseq2.ds import DeseqStats
     stats = DeseqStats(dds, contrast=["condition", numerator, denominator],
                        alpha=config["thresholds"]["padj"], independent_filter=False,
@@ -69,6 +69,11 @@ def contrast_results(dds, numerator, denominator, config):
     result["lfc_ci_low"] = result.log2FoldChange - 1.96 * result.lfcSE
     result["lfc_ci_high"] = result.log2FoldChange + 1.96 * result.lfcSE
     result["signal_strength"] = result.log2FoldChange.abs() * -np.log10(result.padj.clip(lower=np.finfo(float).tiny))
+    if shrink:
+        coefficient = f"condition[T.{numerator}]"
+        stats.lfc_shrink(coeff=coefficient)
+        result["shrunk_log2FoldChange"] = stats.results_df.log2FoldChange.to_numpy()
+        result["shrunk_lfcSE"] = stats.results_df.lfcSE.to_numpy()
     return result
 
 
@@ -78,6 +83,7 @@ def run(config_path, root, out):
     config = load_dataset_config(config_path)
     input_config = {**config, "datasets": [{**d, "archive": str(root / d["archive"])} for d in config["datasets"]]}
     counts, metadata = assemble_counts(input_config)
+    metadata["condition"] = pd.Categorical(metadata.condition, categories=["water", *[d["name"] for d in config["datasets"]]])
     settings = config["benchmark"]
     retained = counts.ge(settings["min_count"]).sum(axis=1).ge(settings["min_samples"])
     if retained.sum() < 2:
@@ -90,8 +96,11 @@ def run(config_path, root, out):
     metadata.to_csv(out / "joint_metadata.csv")
     pd.DataFrame({"gene_id": counts.index, "passes_common_count_filter": retained}).to_csv(out / "gene_filter.csv", index=False)
     normalized.to_csv(out / "joint_normalized_counts.csv", index_label="gene_id")
+    counts.to_csv(out / "joint_raw_counts.csv", index_label="gene_id")
+    dds.vst(use_design=True)
+    pd.DataFrame(dds.layers["vst_counts"].T, index=dds.var_names, columns=dds.obs_names).to_csv(out / "joint_vst_counts.csv", index_label="gene_id")
     for dataset in config["datasets"]:
-        result = contrast_results(dds, dataset["name"], "water", config)
+        result = contrast_results(dds, dataset["name"], "water", config, shrink=True)
         ctrl = metadata.index[metadata.condition.eq("water")]
         drug = metadata.index[metadata.condition.eq(dataset["name"])]
         result["benchmark_basal"] = result.gene_id.map(normalized[ctrl].mean(axis=1))

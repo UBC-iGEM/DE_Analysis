@@ -63,6 +63,27 @@
       "license": "RegulonDB terms and conditions",
       "citation": "RegulonDB release citation; https://regulondb.ccg.unam.mx/",
       "asset_id": "PromoterSet"
+    },
+    {
+      "name": "regulondb_riset",
+      "kind": "regulondb",
+      "provider": "regulondb_graphql",
+      "remote_name": "RISet",
+      "path": "data/references/regulondb/RISet.tsv",
+      "license": "RegulonDB terms and conditions",
+      "citation": "RegulonDB release citation; https://regulondb.ccg.unam.mx/",
+      "asset_id": "RISet"
+    },
+    {
+      "name": "mg1655_genome",
+      "kind": "genome",
+      "provider": "http",
+      "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U00096.3&rettype=fasta&retmode=text",
+      "path": "data/references/ecoli_mg1655/U00096.3.fasta",
+      "source_revision": "U00096.3",
+      "license": "NCBI sequence data-use policy; https://www.ncbi.nlm.nih.gov/home/about/policies/",
+      "citation": "E. coli K-12 MG1655 complete genome, GenBank U00096.3",
+      "asset_id": "U00096.3"
     }
   ]
 }

@@ -302,7 +302,7 @@ def download_assets(manifest: dict[str, Any], root: str | Path | None = None, lo
     for asset in assets:
         destination = root_path / asset["path"]
         prior_record = lock_assets.get(asset["name"], {})
-        extra = {key: prior_record[key] for key in ("remote_name", "remote_id", "columns_details", "regulondb_release") if key in prior_record}
+        extra = {key: prior_record[key] for key in ("source_url", "remote_name", "remote_id", "columns_details", "regulondb_release") if key in prior_record}
         if destination.exists() and prior_record and not refresh_lock:
             observed = sha256_file(destination)
             if observed.lower() != str(prior_record.get("sha256", "")).lower():

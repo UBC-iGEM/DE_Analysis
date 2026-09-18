@@ -25,6 +25,7 @@ results/
   regulatory_network/              Graph, enrichment, provenance, interactive HTML
   promoter_candidates/             Annotated candidates and class shortlists
   promoter_review/                 Gene/TU/promoter mappings and construct review
+  candidate_assessment/            QC figures, stability, cross-reactivity, proposed panel
 tests/                             Scientific-contract and integration regressions
 ```
 
@@ -45,6 +46,7 @@ python -m promoter_discovery.setup_data --download
 python -m promoter_discovery.build_network
 python -m promoter_discovery.score_candidates
 python -m promoter_discovery.promoter_selection
+python -m promoter_discovery.assess_candidates
 python -m promoter_discovery.visualize_network
 ```
 
@@ -54,6 +56,8 @@ to verify the files. The default settings use `config/benchmark.json`,
 
 Reference sources and checksums are recorded in the manifests and locks under
 `config/`. The separate PRECISE-1K manifest provides optional external context.
+The primary references also include regulatory sites and the accession-pinned
+MG1655 genome (U00096.3) for fragment review.
 The optional custom per-dataset runner is
 `python -m promoter_discovery.input_data --config <config>`; the primary
 benchmark requires the joint model command above.
@@ -67,6 +71,27 @@ Open CSV files in a spreadsheet application. On macOS, view the network with:
 ```bash
 open results/regulatory_network/regulatory_network.html
 ```
+
+`results/candidate_assessment/experimental_panel.csv` proposes six promoters
+per class, with no repeated promoter or connected transcription-unit group.
+The same folder contains sample PCA/distances, replicate summaries and plots,
+original-versus-shrunken rankings, cross-reactivity comparisons, operon support,
+fragment review, and promoter context diagrams. Run the assessment after
+regenerating DE, network, scoring, and promoter outputs.
+
+```bash
+python -m promoter_discovery.assess_candidates --panel-per-class 6 --upstream 200 --downstream 30 --off-target-limit 1
+```
+
+Stability measures nine post-fit screening choices within the existing fitted
+gene universe, without model refits. Direct comparisons additionally use BH
+correction across all ten pairs and genes. The off-target limit is a configurable
+descriptive log2 effect bound (1 means twofold), not a validated specificity
+threshold or an equivalence test. Operon support reports concentration in
+connected annotated TUs; it does not supply correlation-adjusted p-values.
+Proposed fragments extend a TSS window to cover known promoter-linked sites.
+They include overlapping gene context and a genome/annotation match
+check, and still require manual boundary review.
 
 The class lists may overlap. Support labels describe measured comparisons,
 not independent validation or calibrated biosensor performance. Annotated

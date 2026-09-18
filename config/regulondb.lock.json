@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-18T01:57:26+00:00",
+  "generated_at": "2026-09-18T22:33:01+00:00",
   "assets": {
     "regulondb_regulator_gene": {
       "path": "data/references/regulondb/network_regulator_gene.tsv",
@@ -72,6 +72,30 @@
       "columns_details": "# Columns:\n# (1) id. Promoter identifier assigned by RegulonDB\n# (2) name. Promoter Name\n# (3) strand. DNA strand where the promoter is located\n# (4) posTSS. Genome map position of Transcription Start Site (+1)\n# (5) sigmaFactor. Sigma Factor that recognize the promoter\n# (6) sequence. Promoter Sequence (+1 upper case)\n# (7) firstGeneName. Name of the first gene of promoter\n# (8) distToFirstGene. distance to first gene of promoter\n# (9) boxMinus10pos. Positions of the box -10\n# (10) boxMinus10pos. Sequence of the box -10\n# (11) boxMinus35pos. Positions of the box -35\n# (12) boxMinus35pos. Sequence of the box -35\n# (13) promoterEvidence. Evidence that supports the existence of the promoter\n# (14) addEvidence. Additive Evidence [CV(EvidenceCode1/EvidenceCodeN)|Confidence Level]\n# (15) confidenceLevel. Promoter confidence level (Values: Confirmed, Strong, Weak)\n# (16) pmids associated to object",
       "regulondb_release": "14.5.0"
     },
+    "regulondb_riset": {
+      "path": "data/references/regulondb/RISet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "18030ff126f80d7b18083bfa531401efa968f20ac9e20897e67a69617122cc0d",
+      "size": 3604562,
+      "retrieved_at": "2026-09-18T22:32:57+00:00",
+      "remote_name": "RISet",
+      "remote_id": "RDBECOLIDLF00001",
+      "columns_details": "# Columns:\n# (1) id. Regulatory interaction (RI) identifier assigned by RegulonDB\n# (2) type. Regulatory interaction type [tf-promoter, tf-tu, tf-gene,srna-promoter, srna-tu, srna-gene, compound-promoter, compound-tu, compound-gene]\n# (3) regulatorId. Transcription Factor (TF) identifier assigned by RegulonDB\n# (4) regulatorName. Regulator name\n# (5) cnfName. regulator active conformation name\n# (6) tfrsId. regulator regulatory site (TFRS) identifier assigned by RegulonDB\n# (7) tfrsLeft. TFRS left end position in the genome\n# (8) tfrsRight. TFRS right end position in the genome\n# (9) strand. DNA strand where the TFRS is located\n# (10) tfrsSeq. TFRS sequence (upper case)\n# (11) riFunction. Gene expression effect caused by the TF bound to the TFRS\n# (12) promoterId. Promoter Identifier assigned by RegulonDB\n# (13) promoterName. Promoter name\n# (14) tss. Transcription start site (+1) position in the genome\n# (15) sigmaF. Sigma Factor that recognize the promoter\n# (16) DistToPm. Relative distance from the center position of TFRS to the Transcription Start Site\n# (17) firstGene. first transcribed gene name\n# (18) tfrsDistTo1Gene. Relative distance from center position of TFRS to the start of first gene\n# (19) targetTuOrGene. Transcription unit or gene (id:name) regulated by the TF\n# (20) confidenceLevel. RI confidence level (Values: Confirmed, Strong, Weak)\n# (21) tfrsEvidence. Evidence that supports the existence of the TFRS [EvidenceCode|EvidenceType(C:confirmed S:strong W:weak)]]\n# (22) riEvidence. Evidence that supports the RI function [EvidenceCode|EvidenceType(C:confirmed S:strong W:weak)]\n# (23) addEvidence. Additive Evidence [CV(EvidenceCode1/EvidenceCodeN)|Confidence Level]\n# (24) riEvTech. Evidence related to the type of technology used to determine the RI\n# (25) riEvCategory. Evidence  were categorized in classical, ht or non-experimental\n# (26) tfrsPMIDS. PMIDS of the TFRS\n# (27) riPMIDS. PMIDS of the regulatory interaction",
+      "regulondb_release": "14.5.0"
+    },
+    "mg1655_genome": {
+      "path": "data/references/ecoli_mg1655/U00096.3.fasta",
+      "provider": "http",
+      "source_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U00096.3&rettype=fasta&retmode=text",
+      "source_revision": "U00096.3",
+      "dataset_release": null,
+      "sha256": "28a7167d8bab60570cd6e3ddacdde75d5c51db60e1009fb8c241f1da446b6152",
+      "size": 4708032,
+      "retrieved_at": "2026-09-18T22:33:00+00:00"
+    },
     "regulondb_k12_gene_mapping:derived": {
       "source_asset": "regulondb_k12_gene_mapping",
       "path": "data/references/regulondb/network_gene_mapping.tsv",
@@ -79,7 +103,7 @@
       "size": 392228,
       "rows": 4759,
       "source_release": "14.5.0",
-      "retrieved_at": "2026-09-18T01:57:26+00:00"
+      "retrieved_at": "2026-09-18T22:33:01+00:00"
     }
   }
 }

@@ -200,6 +200,10 @@ def test_joint_count_model_exports_matched_and_direct_evidence_with_provenance(t
     assert result.loc[genes[:10], "regulation"].eq("upregulated").sum() >= 8
     assert result.loc[genes[:10], "log2FoldChange"].median() > 3
     assert result.lfcSE.gt(0).all()
+    assert result.shrunk_log2FoldChange.notna().all()
+    assert result.shrunk_lfcSE.gt(0).all()
+    assert (out / "joint_vst_counts.csv").exists()
+    assert pd.read_csv(out / "joint_raw_counts.csv", index_col=0).shape == master.shape
     assert result.lfc_ci_low.le(result.log2FoldChange).all()
     pairs = pd.read_csv(out / "drug_pairwise_contrasts.csv").set_index("gene_id")
     assert pairs.loc[genes[:10], "log2FoldChange"].median() > 3

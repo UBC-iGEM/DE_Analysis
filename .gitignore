@@ -3,6 +3,7 @@ results/differential_expression/
 results/regulatory_network/
 results/promoter_candidates/
 results/promoter_review/
+results/candidate_assessment/
 results/custom_analysis/
 results/precise1k_context/
 
