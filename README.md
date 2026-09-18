@@ -25,7 +25,6 @@ results/
   regulatory_network/              Graph, enrichment, provenance, interactive HTML
   promoter_candidates/             Annotated candidates and class shortlists
   promoter_review/                 Gene/TU/promoter mappings and construct review
-docs/                              Current workflow guide and archived planning drafts
 tests/                             Scientific-contract and integration regressions
 ```
 
@@ -53,8 +52,8 @@ Reference acquisition requires network access. Once cached, omit `--download`
 to verify the files. The default settings use `config/benchmark.json`,
 `config/regulondb_assets.json`, and `config/regulondb.lock.json`.
 
-The [workflow guide](docs/workflow.md) explains statistical assumptions,
-reference verification, alternative flags, and optional PRECISE-1K annotations.
+Reference sources and checksums are recorded in the manifests and locks under
+`config/`. The separate PRECISE-1K manifest provides optional external context.
 The optional custom per-dataset runner is
 `python -m promoter_discovery.input_data --config <config>`; the primary
 benchmark requires the joint model command above.

@@ -240,7 +240,7 @@ def load_de_results(
         if not path.exists():
             raise FileNotFoundError(
                 f"Standardized DE file missing for {name}: {path}. "
-                "Run the upstream DE analysis or setup documented in docs/workflow.md."
+                "Run the upstream DE analysis or setup documented in README.md."
             )
         if provenance and provenance.get("de_exports", {}).get(name) != sha256_file(path):
             raise ValueError(f"Benchmark DE export is not verified by joint-fit provenance: {name}; rerun the benchmark")

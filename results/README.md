@@ -1,7 +1,7 @@
 # Analysis results
 
 Generated stage folders are local and ignored by Git. Recreate them with the
-commands in the [project README](../README.md) or [workflow guide](../docs/workflow.md).
+commands in the [project README](../README.md).
 
 | Folder | Contents |
 | --- | --- |

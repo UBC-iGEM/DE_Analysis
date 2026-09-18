@@ -31,4 +31,4 @@ Optional PRECISE-1K assets use `references/precise1k/` and the separate
 context rather than primary antibiotic-response evidence.
 
 All generated analysis tables are in [`results/`](../results/README.md).
-Follow the [workflow guide](../docs/workflow.md) to regenerate them.
+Follow the [project README](../README.md) to regenerate them.
