@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -244,6 +244,60 @@ CREATE TABLE IF NOT EXISTS candidate_panels (
     UNIQUE (run_id, panel_id, transcription_group)
 );
 
+CREATE TABLE IF NOT EXISTS sample_qc (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    study_id TEXT NOT NULL,
+    sample_id TEXT NOT NULL,
+    library_size REAL,
+    genes_detected INTEGER,
+    pc1 REAL,
+    pc2 REAL,
+    distance_summary_json TEXT,
+    PRIMARY KEY (run_id, study_id, sample_id),
+    FOREIGN KEY (study_id, sample_id) REFERENCES samples(study_id, sample_id)
+);
+
+CREATE TABLE IF NOT EXISTS replicate_metrics (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    candidate_id TEXT,
+    contrast_id TEXT REFERENCES contrasts(contrast_id),
+    condition TEXT,
+    replicate_count INTEGER,
+    mean_value REAL,
+    standard_deviation REAL,
+    coefficient_of_variation REAL,
+    metrics_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS operon_support (
+    support_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    tu_id TEXT REFERENCES transcription_units(tu_id),
+    regulated_set TEXT,
+    dominant_group_fraction REAL,
+    enrichment REAL,
+    padj REAL,
+    direction TEXT,
+    metadata_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS fragment_reviews (
+    fragment_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    promoter_id TEXT REFERENCES promoters(promoter_id),
+    genome_accession TEXT,
+    start INTEGER,
+    end INTEGER,
+    strand TEXT CHECK (strand IN ('+', '-', '?') OR strand IS NULL),
+    sequence TEXT,
+    sequence_match INTEGER CHECK (sequence_match IN (0, 1) OR sequence_match IS NULL),
+    missing_coordinates INTEGER NOT NULL DEFAULT 0 CHECK (missing_coordinates IN (0, 1)),
+    regulatory_site_count INTEGER,
+    overlapping_genes_json TEXT,
+    review_status TEXT NOT NULL DEFAULT 'review',
+    metadata_json TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_run ON assets(run_id);
 CREATE INDEX IF NOT EXISTS idx_samples_condition ON samples(condition);
 CREATE INDEX IF NOT EXISTS idx_promoters_tu ON promoters(tu_id);
@@ -260,6 +314,10 @@ CREATE INDEX IF NOT EXISTS idx_candidates_class ON candidates(antibiotic_class, 
 CREATE INDEX IF NOT EXISTS idx_candidates_gene ON candidates(gene_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_contrast ON candidate_evidence(contrast_id, padj);
 CREATE INDEX IF NOT EXISTS idx_panel_class ON candidate_panels(panel_id, antibiotic_class);
+CREATE INDEX IF NOT EXISTS idx_qc_sample ON sample_qc(sample_id);
+CREATE INDEX IF NOT EXISTS idx_replicates_candidate ON replicate_metrics(candidate_id, contrast_id);
+CREATE INDEX IF NOT EXISTS idx_operon_run ON operon_support(run_id, tu_id);
+CREATE INDEX IF NOT EXISTS idx_fragments_promoter ON fragment_reviews(promoter_id);
 """
 
 

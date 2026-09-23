@@ -109,3 +109,16 @@ def test_panel_rejects_duplicate_promoter_and_transcription_group(tmp_path):
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute("INSERT INTO candidate_panels(run_id, panel_id, candidate_id, promoter_id, antibiotic_class, transcription_group) VALUES ('run-1', 'panel-1', 'c2', 'p2', 'beta_lactam', 'tu1')")
     close_database(connection)
+
+
+def test_qc_and_fragment_reviews_require_valid_source_entities(tmp_path):
+    connection = open_database(tmp_path / "project.sqlite")
+    connection.execute("INSERT INTO studies(study_id, accession) VALUES ('study-1', 'GSE-test')")
+    connection.execute("INSERT INTO samples(sample_id, study_id, condition) VALUES ('sample-1', 'study-1', 'control')")
+    connection.execute("INSERT INTO analysis_runs(run_id, created_at, status) VALUES ('run-1', 'now', 'complete')")
+    connection.execute("INSERT INTO sample_qc(run_id, study_id, sample_id, library_size) VALUES ('run-1', 'study-1', 'sample-1', 1000)")
+    connection.execute("INSERT INTO promoters(promoter_id) VALUES ('p-1')")
+    connection.execute("INSERT INTO fragment_reviews(fragment_id, run_id, promoter_id, sequence_match) VALUES ('f-1', 'run-1', 'p-1', 1)")
+    assert connection.execute("SELECT COUNT(*) FROM sample_qc").fetchone()[0] == 1
+    assert connection.execute("SELECT COUNT(*) FROM fragment_reviews WHERE sequence_match = 1").fetchone()[0] == 1
+    close_database(connection)
