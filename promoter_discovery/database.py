@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -200,6 +200,50 @@ CREATE TABLE IF NOT EXISTS promoter_genes (
     PRIMARY KEY (promoter_id, gene_id)
 );
 
+CREATE TABLE IF NOT EXISTS candidates (
+    candidate_id TEXT NOT NULL,
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    promoter_id TEXT REFERENCES promoters(promoter_id),
+    antibiotic_class TEXT NOT NULL,
+    support_tier TEXT,
+    ranking_score REAL,
+    response_summary_json TEXT,
+    status TEXT NOT NULL DEFAULT 'proposed',
+    review_flags_json TEXT,
+    PRIMARY KEY (run_id, candidate_id),
+    UNIQUE (run_id, gene_id, promoter_id)
+);
+
+CREATE TABLE IF NOT EXISTS candidate_evidence (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    candidate_id TEXT NOT NULL,
+    contrast_id TEXT NOT NULL REFERENCES contrasts(contrast_id),
+    effect REAL,
+    padj REAL,
+    ci_low REAL,
+    ci_high REAL,
+    direction TEXT,
+    evidence_role TEXT,
+    PRIMARY KEY (run_id, candidate_id, contrast_id),
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
+);
+
+CREATE TABLE IF NOT EXISTS candidate_panels (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    panel_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    promoter_id TEXT REFERENCES promoters(promoter_id),
+    antibiotic_class TEXT NOT NULL,
+    selection_order INTEGER,
+    selection_rationale TEXT,
+    transcription_group TEXT,
+    PRIMARY KEY (run_id, panel_id, candidate_id),
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id),
+    UNIQUE (run_id, panel_id, promoter_id),
+    UNIQUE (run_id, panel_id, transcription_group)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_run ON assets(run_id);
 CREATE INDEX IF NOT EXISTS idx_samples_condition ON samples(condition);
 CREATE INDEX IF NOT EXISTS idx_promoters_tu ON promoters(tu_id);
@@ -212,6 +256,10 @@ CREATE INDEX IF NOT EXISTS idx_edges_regulator ON regulatory_edges(regulator_id)
 CREATE INDEX IF NOT EXISTS idx_edges_target ON regulatory_edges(target_gene_id);
 CREATE INDEX IF NOT EXISTS idx_tu_genes_gene ON tu_genes(gene_id);
 CREATE INDEX IF NOT EXISTS idx_tu_promoters_promoter ON tu_promoters(promoter_id);
+CREATE INDEX IF NOT EXISTS idx_candidates_class ON candidates(antibiotic_class, support_tier);
+CREATE INDEX IF NOT EXISTS idx_candidates_gene ON candidates(gene_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_contrast ON candidate_evidence(contrast_id, padj);
+CREATE INDEX IF NOT EXISTS idx_panel_class ON candidate_panels(panel_id, antibiotic_class);
 """
 
 
