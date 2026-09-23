@@ -106,8 +106,8 @@ the Python API (`promoter_discovery.db_api.Database`) or the search CLI:
 
 ```bash
 python -m promoter_discovery.db_cli candidates --class beta_lactam
-python -m promoter_discovery.db_cli candidate gfcc --json
-python -m promoter_discovery.db_cli panel --json
+python -m promoter_discovery.db_cli --json candidate gfcc
+python -m promoter_discovery.db_cli --json panel
 ```
 
 Use `--skip-database` on `assess_candidates` when only the assessment files are
