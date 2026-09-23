@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -166,6 +166,40 @@ CREATE TABLE IF NOT EXISTS de_results (
     PRIMARY KEY (run_id, contrast_id, gene_id)
 );
 
+CREATE TABLE IF NOT EXISTS regulatory_edges (
+    edge_id TEXT PRIMARY KEY,
+    run_id TEXT REFERENCES analysis_runs(run_id),
+    regulator_id TEXT NOT NULL REFERENCES regulators(regulator_id),
+    target_gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    edge_type TEXT NOT NULL,
+    effect TEXT,
+    evidence TEXT,
+    confidence TEXT,
+    source_release TEXT,
+    metadata_json TEXT,
+    UNIQUE (run_id, regulator_id, target_gene_id, edge_type, source_release)
+);
+
+CREATE TABLE IF NOT EXISTS tu_genes (
+    tu_id TEXT NOT NULL REFERENCES transcription_units(tu_id),
+    gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    gene_order INTEGER,
+    PRIMARY KEY (tu_id, gene_id)
+);
+
+CREATE TABLE IF NOT EXISTS tu_promoters (
+    tu_id TEXT NOT NULL REFERENCES transcription_units(tu_id),
+    promoter_id TEXT NOT NULL REFERENCES promoters(promoter_id),
+    PRIMARY KEY (tu_id, promoter_id)
+);
+
+CREATE TABLE IF NOT EXISTS promoter_genes (
+    promoter_id TEXT NOT NULL REFERENCES promoters(promoter_id),
+    gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    relationship TEXT,
+    PRIMARY KEY (promoter_id, gene_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_run ON assets(run_id);
 CREATE INDEX IF NOT EXISTS idx_samples_condition ON samples(condition);
 CREATE INDEX IF NOT EXISTS idx_promoters_tu ON promoters(tu_id);
@@ -174,6 +208,10 @@ CREATE INDEX IF NOT EXISTS idx_sites_regulator ON regulatory_sites(regulator_id)
 CREATE INDEX IF NOT EXISTS idx_contrasts_run ON contrasts(run_id);
 CREATE INDEX IF NOT EXISTS idx_de_gene ON de_results(gene_id, contrast_id);
 CREATE INDEX IF NOT EXISTS idx_de_padj ON de_results(contrast_id, padj);
+CREATE INDEX IF NOT EXISTS idx_edges_regulator ON regulatory_edges(regulator_id);
+CREATE INDEX IF NOT EXISTS idx_edges_target ON regulatory_edges(target_gene_id);
+CREATE INDEX IF NOT EXISTS idx_tu_genes_gene ON tu_genes(gene_id);
+CREATE INDEX IF NOT EXISTS idx_tu_promoters_promoter ON tu_promoters(promoter_id);
 """
 
 

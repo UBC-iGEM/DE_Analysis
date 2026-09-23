@@ -76,3 +76,23 @@ def test_de_results_require_run_contrast_and_gene(tmp_path):
         )
     assert connection.execute("SELECT COUNT(*) FROM de_results").fetchone()[0] == 1
     close_database(connection)
+
+
+def test_regulatory_relationships_can_traverse_regulator_to_promoter(tmp_path):
+    connection = open_database(tmp_path / "project.sqlite")
+    connection.execute("INSERT INTO regulators(regulator_id, name) VALUES (?, ?)", ("crp", "CRP"))
+    connection.execute("INSERT INTO genes(gene_id, canonical_name) VALUES (?, ?)", ("b0001", "geneA"))
+    connection.execute("INSERT INTO transcription_units(tu_id, name) VALUES (?, ?)", ("tu-1", "tuA"))
+    connection.execute("INSERT INTO promoters(promoter_id, tu_id, name) VALUES (?, ?, ?)", ("p-1", "tu-1", "pA"))
+    connection.execute("INSERT INTO tu_genes(tu_id, gene_id) VALUES (?, ?)", ("tu-1", "b0001"))
+    connection.execute("INSERT INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", ("tu-1", "p-1"))
+    connection.execute("INSERT INTO regulatory_edges(edge_id, regulator_id, target_gene_id, edge_type) VALUES (?, ?, ?, ?)", ("e-1", "crp", "b0001", "transcriptional"))
+    row = connection.execute(
+        "SELECT r.name, p.promoter_id FROM regulatory_edges e "
+        "JOIN regulators r ON r.regulator_id = e.regulator_id "
+        "JOIN tu_genes tg ON tg.gene_id = e.target_gene_id "
+        "JOIN tu_promoters tp ON tp.tu_id = tg.tu_id "
+        "JOIN promoters p ON p.promoter_id = tp.promoter_id"
+    ).fetchone()
+    assert tuple(row) == ("CRP", "p-1")
+    close_database(connection)
