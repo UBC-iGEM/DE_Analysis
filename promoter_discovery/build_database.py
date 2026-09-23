@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import os
+import pickle
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -198,6 +199,46 @@ def _insert_assessment(connection, root: Path, run_id: str) -> None:
         connection.execute("INSERT OR IGNORE INTO operon_support(support_id, run_id, regulated_set, dominant_group_fraction, enrichment, padj, direction, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (support_id, run_id, row.get("overlap_genes"), _number(row.get("dominant_group_gene_fraction")), _number(row.get("odds_ratio")), _number(row.get("padj")), row.get("direction"), json.dumps(row)))
 
 
+def _insert_regulatory_sites(connection, root: Path) -> None:
+    path = root / "results/candidate_assessment/regulatory_sites.csv"
+    if not path.exists():
+        return
+    for row in _read_csv(path):
+        promoter_id = row.get("promoterID") or None
+        regulator_id = row.get("regulatorId") or row.get("regulatorName") or None
+        if promoter_id:
+            connection.execute("INSERT OR IGNORE INTO promoters(promoter_id, name, tss, sigma_factor, annotation_status) VALUES (?, ?, ?, ?, ?)", (promoter_id, row.get("promoterName"), _number(row.get("tss")), row.get("sigmaF"), "site_annotation"))
+        if regulator_id:
+            connection.execute("INSERT OR IGNORE INTO regulators(regulator_id, name) VALUES (?, ?)", (regulator_id, row.get("regulatorName") or regulator_id))
+        connection.execute("INSERT OR IGNORE INTO regulatory_sites(site_id, promoter_id, regulator_id, start, end, strand, sequence, function, evidence, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (row.get("id"), promoter_id, regulator_id, _number(row.get("tfrsLeft")), _number(row.get("tfrsRight")), _strand(row.get("strand")), row.get("tfrsSeq"), row.get("riFunction"), row.get("tfrsEvidence"), row.get("confidenceLevel")))
+
+
+def _insert_network(connection, root: Path, run_id: str) -> None:
+    """Import the serialized graph when its optional network dependency exists."""
+    path = root / "results/regulatory_network/regulatory_network.pkl"
+    if not path.exists():
+        return
+    try:
+        with path.open("rb") as handle:
+            graph = pickle.load(handle)
+    except (ImportError, ModuleNotFoundError, AttributeError, EOFError, pickle.UnpicklingError):
+        return
+    regulator_nodes = set()
+    for node, attrs in graph.nodes(data=True):
+        node_type = str(attrs.get("node_type", "")).lower()
+        if attrs.get("is_regulator") or node_type in {"regulator", "sigma"}:
+            regulator_nodes.add(str(node))
+            connection.execute("INSERT OR IGNORE INTO regulators(regulator_id, name, regulator_type) VALUES (?, ?, ?)", (str(node), attrs.get("label") or attrs.get("canonical_gene") or str(node), attrs.get("regulator_type") or node_type or "regulator"))
+        else:
+            connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name, locus_tag) VALUES (?, ?, ?)", (str(node), attrs.get("canonical_gene") or str(node), attrs.get("canonical_locus_tag")))
+    for source, target, attrs in graph.edges(data=True):
+        source, target = str(source), str(target)
+        if source not in regulator_nodes:
+            continue
+        edge_id = hashlib.sha256(f"{run_id}:{source}:{target}:{attrs}".encode()).hexdigest()[:24]
+        connection.execute("INSERT OR IGNORE INTO regulatory_edges(edge_id, run_id, regulator_id, target_gene_id, edge_type, effect, evidence, confidence, source_release, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (edge_id, run_id, source, target, attrs.get("edge_type") or attrs.get("type") or "regulatory", attrs.get("effect"), attrs.get("evidence"), attrs.get("confidence"), attrs.get("source_release") or "RegulonDB 14.5.0", json.dumps(attrs, default=str)))
+
+
 def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_DATABASE) -> Path:
     root = Path(root).resolve()
     database_path = Path(database_path)
@@ -217,8 +258,10 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
             _insert_run(connection, run_id, input_hash)
             _insert_antibiotics(connection)
             _insert_de(connection, root, run_id)
+            _insert_network(connection, root, run_id)
             _insert_samples(connection, root, run_id)
             _insert_promoters(connection, root)
+            _insert_regulatory_sites(connection, root)
             _insert_candidates(connection, root, run_id)
             _insert_assessment(connection, root, run_id)
             connection.execute("UPDATE analysis_runs SET status='complete', summary_json=? WHERE run_id=?", (json.dumps({"input_files": len(inputs)}), run_id))
