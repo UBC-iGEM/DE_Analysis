@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -318,6 +318,48 @@ CREATE INDEX IF NOT EXISTS idx_qc_sample ON sample_qc(sample_id);
 CREATE INDEX IF NOT EXISTS idx_replicates_candidate ON replicate_metrics(candidate_id, contrast_id);
 CREATE INDEX IF NOT EXISTS idx_operon_run ON operon_support(run_id, tu_id);
 CREATE INDEX IF NOT EXISTS idx_fragments_promoter ON fragment_reviews(promoter_id);
+
+CREATE VIEW IF NOT EXISTS candidate_summary AS
+SELECT c.run_id, c.candidate_id, c.gene_id, g.canonical_name, c.promoter_id,
+       c.antibiotic_class, c.support_tier, c.ranking_score, c.status,
+       p.name AS promoter_name, p.tss, p.sigma_factor, p.annotation_status
+FROM candidates c
+JOIN genes g ON g.gene_id = c.gene_id
+LEFT JOIN promoters p ON p.promoter_id = c.promoter_id;
+
+CREATE VIEW IF NOT EXISTS drug_response_matrix AS
+SELECT d.run_id, d.gene_id, g.canonical_name, x.name AS contrast_name,
+       x.antibiotic_class, x.proxy_role, d.log2_fold_change,
+       d.shrunk_log2_fold_change, d.padj, d.regulation
+FROM de_results d
+JOIN genes g ON g.gene_id = d.gene_id
+JOIN contrasts x ON x.contrast_id = d.contrast_id;
+
+CREATE VIEW IF NOT EXISTS panel_review AS
+SELECT p.run_id, p.panel_id, p.candidate_id, p.antibiotic_class,
+       p.selection_order, p.selection_rationale, p.transcription_group,
+       c.gene_id, p.promoter_id, pr.name AS promoter_name,
+       pr.sequence, pr.annotation_status, f.sequence_match,
+       f.review_status
+FROM candidate_panels p
+JOIN candidates c ON c.run_id = p.run_id AND c.candidate_id = p.candidate_id
+LEFT JOIN promoters pr ON pr.promoter_id = p.promoter_id
+LEFT JOIN fragment_reviews f ON f.run_id = p.run_id AND f.promoter_id = p.promoter_id;
+
+CREATE VIEW IF NOT EXISTS regulator_candidate_paths AS
+SELECT e.run_id, e.regulator_id, r.name AS regulator_name,
+       e.target_gene_id AS gene_id, g.canonical_name, c.candidate_id,
+       c.antibiotic_class, c.promoter_id
+FROM regulatory_edges e
+JOIN regulators r ON r.regulator_id = e.regulator_id
+JOIN genes g ON g.gene_id = e.target_gene_id
+LEFT JOIN candidates c ON c.run_id = e.run_id AND c.gene_id = e.target_gene_id;
+
+CREATE VIEW IF NOT EXISTS sample_qc_summary AS
+SELECT q.run_id, q.sample_id, s.condition, s.source_file,
+       q.library_size, q.genes_detected, q.pc1, q.pc2
+FROM sample_qc q
+JOIN samples s ON s.study_id = q.study_id AND s.sample_id = q.sample_id;
 """
 
 
