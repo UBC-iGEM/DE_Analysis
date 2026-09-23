@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .database import DEFAULT_DATABASE, open_database
@@ -75,3 +77,30 @@ class Database:
         if run_id:
             return self._rows("SELECT * FROM sample_qc_summary WHERE run_id = ? ORDER BY sample_id", (run_id,))
         return self._rows("SELECT * FROM sample_qc_summary ORDER BY run_id, sample_id")
+
+    def record_candidate_review(
+        self,
+        run_id: str,
+        candidate_id: str,
+        review_status: str,
+        editor: str,
+        reason: str,
+        priority: int | None = None,
+        construct_ready: bool | None = None,
+        notes: str | None = None,
+        source_reference: str | None = None,
+    ) -> str:
+        """Append a validated candidate review and return its edit ID."""
+        valid = {"proposed", "reviewed", "approved", "excluded"}
+        if review_status not in valid:
+            raise ValueError(f"review_status must be one of {sorted(valid)}")
+        exists = self.connection.execute("SELECT 1 FROM candidates WHERE run_id = ? AND candidate_id = ?", (run_id, candidate_id)).fetchone()
+        if not exists:
+            raise ValueError(f"Unknown candidate {candidate_id!r} for run {run_id!r}")
+        edited_at = datetime.now(timezone.utc).isoformat()
+        edit_id = "edit-" + hashlib.sha256(f"{run_id}:{candidate_id}:{edited_at}:{editor}".encode()).hexdigest()[:20]
+        previous = self.connection.execute("SELECT review_status FROM candidate_reviews WHERE run_id = ? AND candidate_id = ? ORDER BY edit_id DESC LIMIT 1", (run_id, candidate_id)).fetchone()
+        with self.connection:
+            self.connection.execute("INSERT INTO curation_edits(edit_id, run_id, entity_type, entity_id, field_name, old_value, new_value, editor, edited_at, reason, source_reference) VALUES (?, ?, 'candidate', ?, 'review_status', ?, ?, ?, ?, ?, ?)", (edit_id, run_id, candidate_id, previous[0] if previous else None, review_status, editor, edited_at, reason, source_reference))
+            self.connection.execute("INSERT INTO candidate_reviews(edit_id, run_id, candidate_id, review_status, priority, construct_ready, notes) VALUES (?, ?, ?, ?, ?, ?, ?)", (edit_id, run_id, candidate_id, review_status, priority, None if construct_ready is None else int(construct_ready), notes))
+        return edit_id
