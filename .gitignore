@@ -6,6 +6,7 @@ results/promoter_review/
 results/candidate_assessment/
 results/custom_analysis/
 results/precise1k_context/
+results/promoter_discovery.sqlite*
 
 # Downloaded reference assets (source metadata and locks stay tracked)
 data/references/

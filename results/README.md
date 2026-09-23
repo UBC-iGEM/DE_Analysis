@@ -11,6 +11,7 @@ commands in the [project README](../README.md).
 | `promoter_candidates/` | `annotated_candidates.csv`, `beta_lactam_candidates.csv`, and `aminoglycoside_candidates.csv` |
 | `promoter_review/` | `candidate_promoter_mapping.csv` and grouped `promoter_review.csv` |
 | `candidate_assessment/` | QC and panel figures, replicate summaries, screening stability, cross-reactivity, operon support, proposed fragments, and `experimental_panel.csv` |
+| `promoter_discovery.sqlite` | Generated SQLite query layer linking DE, network, promoter, candidate, panel, QC, and fragment-review records |
 
 Start with the two class shortlists, then review the promoter table. Class lists
 can overlap. The benchmark uses class proxies for the four wet-lab antibiotics;
@@ -28,3 +29,7 @@ in the current provenance. Subsequent model runs write fresh fit provenance.
 Optional PRECISE-1K graph annotations go in `regulatory_network/precise1k/`.
 The documented optional scoring command writes to `precise1k_context/`.
 The custom per-dataset runner writes diagnostic outputs to `custom_analysis/`.
+
+Search the generated database with `python -m promoter_discovery.db_cli` or use
+`promoter_discovery.db_api.Database` from Python. The CSV, JSON, and FASTA files
+remain the reproducible source artifacts; the SQLite file is rebuilt from them.

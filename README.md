@@ -47,6 +47,7 @@ python -m promoter_discovery.build_network
 python -m promoter_discovery.score_candidates
 python -m promoter_discovery.promoter_selection
 python -m promoter_discovery.assess_candidates
+python -m promoter_discovery.build_database
 python -m promoter_discovery.visualize_network
 ```
 
@@ -97,6 +98,20 @@ The class lists may overlap. Support labels describe measured comparisons,
 not independent validation or calibrated biosensor performance. Annotated
 promoter sequences need operator and fragment-boundary review before ordering;
 wet-lab measurements establish transfer to the actual four antibiotics.
+
+The generated SQLite database is written to `results/promoter_discovery.sqlite`
+after candidate assessment. It indexes the DE, regulatory, promoter, candidate,
+panel, QC, and fragment-review outputs without replacing the source files. Use
+the Python API (`promoter_discovery.db_api.Database`) or the search CLI:
+
+```bash
+python -m promoter_discovery.db_cli candidates --class beta_lactam
+python -m promoter_discovery.db_cli candidate gfcc --json
+python -m promoter_discovery.db_cli panel --json
+```
+
+Use `--skip-database` on `assess_candidates` when only the assessment files are
+needed; `build_database` remains available for an explicit rebuild.
 
 ## Verification
 

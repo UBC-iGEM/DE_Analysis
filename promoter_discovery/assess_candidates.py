@@ -319,6 +319,7 @@ def main(argv=None):
     parser.add_argument("--off-target-limit", type=float, default=1.0, help="Descriptive log2 effect bound, default twofold; not a specificity test")
     parser.add_argument("--upstream", type=int, default=200)
     parser.add_argument("--downstream", type=int, default=30)
+    parser.add_argument("--skip-database", action="store_true", help="do not rebuild the generated SQLite database")
     args = parser.parse_args(argv)
     root = args.root
     out = args.out or root / "results/candidate_assessment"
@@ -369,6 +370,11 @@ def main(argv=None):
                "panel_selection": "Greedy review proposal; equal class quotas; no repeated promoter or connected TU group; not an optimized or validated biosensor panel",
                "limitations": "Class proxies, three replicates per condition, shared controls. Expression is not reporter fluorescence; CI bounds are descriptive, not equivalence tests. Fragments require manual review."}
     (out / "analysis_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    if not args.skip_database:
+        from .build_database import build_database
+
+        database_path = build_database(root)
+        print(f"[database] {database_path}")
     print(f"[assessment] {len(candidates)} candidates; {len(fragments)} fragment reviews; {len(panel)} proposed panel promoters")
     print(f"[save] {out}")
 
