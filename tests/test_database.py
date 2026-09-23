@@ -51,3 +51,28 @@ def test_transaction_rolls_back_on_error(tmp_path):
 
     assert connection.execute("SELECT COUNT(*) FROM studies").fetchone()[0] == 0
     close_database(connection)
+
+
+def test_de_results_require_run_contrast_and_gene(tmp_path):
+    connection = open_database(tmp_path / "project.sqlite")
+    connection.execute(
+        "INSERT INTO analysis_runs(run_id, created_at, status) VALUES (?, ?, ?)",
+        ("run-1", "2026-01-01T00:00:00Z", "complete"),
+    )
+    connection.execute(
+        "INSERT INTO contrasts(contrast_id, run_id, name, numerator, denominator, comparison_type) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        ("contrast-1", "run-1", "drug_vs_water", "drug", "water", "drug_control"),
+    )
+    connection.execute("INSERT INTO genes(gene_id) VALUES (?)", ("b0001",))
+    connection.execute(
+        "INSERT INTO de_results(run_id, contrast_id, gene_id, padj, regulation) VALUES (?, ?, ?, ?, ?)",
+        ("run-1", "contrast-1", "b0001", 0.01, "upregulated"),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO de_results(run_id, contrast_id, gene_id) VALUES (?, ?, ?)",
+            ("run-1", "contrast-1", "missing-gene"),
+        )
+    assert connection.execute("SELECT COUNT(*) FROM de_results").fetchone()[0] == 1
+    close_database(connection)

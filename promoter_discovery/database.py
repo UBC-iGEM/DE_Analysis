@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -131,11 +131,49 @@ CREATE TABLE IF NOT EXISTS regulatory_sites (
     annotation_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS contrasts (
+    contrast_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    antibiotic_id TEXT REFERENCES antibiotics(antibiotic_id),
+    name TEXT NOT NULL,
+    numerator TEXT NOT NULL,
+    denominator TEXT NOT NULL,
+    comparison_type TEXT NOT NULL CHECK (comparison_type IN ('drug_control', 'drug_drug')),
+    antibiotic_class TEXT,
+    proxy_role TEXT,
+    effect_cutoff REAL,
+    padj_cutoff REAL,
+    metadata_json TEXT,
+    UNIQUE (run_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS de_results (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    contrast_id TEXT NOT NULL REFERENCES contrasts(contrast_id),
+    gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    base_mean REAL,
+    log2_fold_change REAL,
+    log2_fold_change_se REAL,
+    shrunk_log2_fold_change REAL,
+    shrunk_lfc_se REAL,
+    p_value REAL,
+    padj REAL,
+    ci_low REAL,
+    ci_high REAL,
+    regulation TEXT,
+    eligible INTEGER NOT NULL DEFAULT 1 CHECK (eligible IN (0, 1)),
+    source_row_id TEXT,
+    PRIMARY KEY (run_id, contrast_id, gene_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_run ON assets(run_id);
 CREATE INDEX IF NOT EXISTS idx_samples_condition ON samples(condition);
 CREATE INDEX IF NOT EXISTS idx_promoters_tu ON promoters(tu_id);
 CREATE INDEX IF NOT EXISTS idx_sites_promoter ON regulatory_sites(promoter_id);
 CREATE INDEX IF NOT EXISTS idx_sites_regulator ON regulatory_sites(regulator_id);
+CREATE INDEX IF NOT EXISTS idx_contrasts_run ON contrasts(run_id);
+CREATE INDEX IF NOT EXISTS idx_de_gene ON de_results(gene_id, contrast_id);
+CREATE INDEX IF NOT EXISTS idx_de_padj ON de_results(contrast_id, padj);
 """
 
 
