@@ -61,38 +61,68 @@ def _json(value: str | None):
         return json.dumps(value)
 
 
-def _sha256(paths: Iterable[Path]) -> str:
+def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    for path in sorted(paths):
-        digest.update(str(path).encode())
-        digest.update(path.read_bytes())
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
     return digest.hexdigest()
 
 
-def _required_files(root: Path) -> list[Path]:
+def _required_files(root: Path, config: dict) -> list[Path]:
     results = root / "results"
     files = [
+        root / "config/benchmark.json",
+        root / "config/regulondb.lock.json",
+        results / "differential_expression/model/benchmark_provenance.json",
+        results / "differential_expression/model/drug_pairwise_contrasts.csv",
+        results / "regulatory_network/regulatory_network.pkl",
+        results / "regulatory_network/source_observations.csv",
+        results / "regulatory_network/scoring_provenance.json",
         results / "candidate_assessment" / "experimental_panel.csv",
         results / "candidate_assessment" / "fragment_review.csv",
         results / "candidate_assessment" / "operon_support.csv",
+        results / "candidate_assessment" / "regulatory_sites.csv",
         results / "candidate_assessment" / "sample_qc.csv",
         results / "promoter_candidates" / "annotated_candidates.csv",
         results / "promoter_review" / "promoter_review.csv",
         results / "promoter_review" / "candidate_promoter_mapping.csv",
     ]
-    files.extend((results / "differential_expression" / "contrasts").glob("*/de_results.csv"))
+    files.extend(
+        results / "differential_expression/contrasts" / dataset["output_directory"] / "de_results.csv"
+        for dataset in config["datasets"]
+    )
     missing = [path for path in files if not path.exists()]
     if missing:
         raise FileNotFoundError("Database inputs missing: " + ", ".join(map(str, missing)))
     return files
 
 
-def _insert_run(connection, run_id: str, input_hash: str) -> None:
+def _input_hashes(root: Path, files: Iterable[Path]) -> tuple[str, dict[str, str]]:
+    hashes = {path.relative_to(root).as_posix(): _file_sha256(path) for path in files}
+    combined = hashlib.sha256()
+    for path, digest in sorted(hashes.items()):
+        combined.update(f"{path}:{digest}\n".encode())
+    return combined.hexdigest(), hashes
+
+
+def _insert_run(connection, run_id: str, input_hash: str, config_hash: str, release: str) -> None:
     connection.execute(
-        "INSERT INTO analysis_runs(run_id, created_at, status, input_sha256, reference_release) "
-        "VALUES (?, ?, 'building', ?, ?)",
-        (run_id, datetime.now(timezone.utc).isoformat(), input_hash, "RegulonDB 14.5.0"),
+        "INSERT INTO analysis_runs(run_id, created_at, status, config_sha256, input_sha256, reference_release) "
+        "VALUES (?, ?, 'building', ?, ?, ?)",
+        (run_id, datetime.now(timezone.utc).isoformat(), config_hash, input_hash, release),
     )
+
+
+def _insert_assets(connection, root: Path, run_id: str, files: list[Path], hashes: dict[str, str], release: str) -> None:
+    for path in files:
+        relative = path.relative_to(root).as_posix()
+        connection.execute(
+            "INSERT INTO assets(asset_id, run_id, path, kind, source_release, sha256, size_bytes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (relative, run_id, relative, path.suffix.lstrip(".") or "file", release,
+             hashes[relative], path.stat().st_size),
+        )
 
 
 def _insert_antibiotics(connection) -> None:
@@ -116,15 +146,18 @@ def _insert_genes(connection, rows: Iterable[dict[str, str]]) -> None:
         )
 
 
-def _insert_de(connection, root: Path, run_id: str) -> None:
+def _insert_de(connection, root: Path, run_id: str, config: dict) -> dict[str, str]:
     contrast_root = root / "results/differential_expression/contrasts"
-    for path in sorted(contrast_root.glob("*/de_results.csv")):
-        observed = path.parent.name
+    contrast_ids = {}
+    for dataset in config["datasets"]:
+        observed = dataset["treatment"]
+        path = contrast_root / dataset["output_directory"] / "de_results.csv"
         rows = _read_csv(path)
         if not rows:
             continue
         first = rows[0]
         comparison_id = f"{run_id}:{observed}"
+        contrast_ids[dataset["name"]] = comparison_id
         target, antibiotic_class, proxy_role = TARGETS.get(observed, (observed, "other", "control"))
         connection.execute(
             "INSERT INTO contrasts(contrast_id, run_id, antibiotic_id, name, numerator, denominator, comparison_type, antibiotic_class, proxy_role) "
@@ -143,6 +176,60 @@ def _insert_de(connection, root: Path, run_id: str) -> None:
                  _number(row.get("lfc_ci_low")), _number(row.get("lfc_ci_high")), row.get("regulation"),
                  int(bool(_boolean(row.get("eligible_for_network"), True))), f"{observed}:{index}"),
             )
+    return contrast_ids
+
+
+def _insert_pairwise(connection, root: Path, run_id: str, config: dict) -> None:
+    datasets = {dataset["name"]: dataset for dataset in config["datasets"]}
+    rows = _read_csv(root / "results/differential_expression/model/drug_pairwise_contrasts.csv")
+    for index, row in enumerate(rows):
+        numerator = row["numerator_dataset"]
+        denominator = row["denominator_dataset"]
+        if numerator not in datasets or denominator not in datasets:
+            raise ValueError(f"Unknown direct-comparison dataset: {numerator}, {denominator}")
+        contrast_id = f"{run_id}:pair:{numerator}:{denominator}"
+        connection.execute(
+            "INSERT OR IGNORE INTO contrasts(contrast_id, run_id, name, numerator, denominator, comparison_type, proxy_role) "
+            "VALUES (?, ?, ?, ?, ?, 'drug_drug', 'direct_comparison')",
+            (contrast_id, run_id, f"{numerator}_vs_{denominator}", numerator, denominator),
+        )
+        gene_id = row["gene_id"]
+        connection.execute("INSERT OR IGNORE INTO genes(gene_id) VALUES (?)", (gene_id,))
+        connection.execute(
+            "INSERT INTO de_results(run_id, contrast_id, gene_id, base_mean, log2_fold_change, "
+            "log2_fold_change_se, p_value, padj, ci_low, ci_high, regulation, eligible, source_row_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_id, contrast_id, gene_id, _number(row.get("baseMean")),
+             _number(row.get("log2FoldChange")), _number(row.get("lfcSE")),
+             _number(row.get("pvalue")), _number(row.get("padj")),
+             _number(row.get("lfc_ci_low")), _number(row.get("lfc_ci_high")),
+             row.get("regulation"), int(bool(_boolean(row.get("eligible_for_network"), True))),
+             f"pairwise:{index}"),
+        )
+
+
+def _insert_candidate_evidence(connection, root: Path, run_id: str, contrast_ids: dict[str, str]) -> None:
+    candidate_ids = {
+        row[0] for row in connection.execute(
+            "SELECT candidate_id FROM candidates WHERE run_id = ?", (run_id,)
+        )
+    }
+    for row in _read_csv(root / "results/regulatory_network/source_observations.csv"):
+        candidate_id = row["canonical_gene"]
+        if candidate_id not in candidate_ids:
+            continue
+        source_dataset = row["source_dataset"]
+        if source_dataset not in contrast_ids:
+            raise ValueError(f"Unknown candidate evidence dataset: {source_dataset}")
+        connection.execute(
+            "INSERT INTO candidate_evidence(run_id, candidate_id, contrast_id, source_gene_id, "
+            "effect, padj, ci_low, ci_high, direction, evidence_role) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_id, candidate_id, contrast_ids[source_dataset], row["source_gene_id"],
+             _number(row.get("log2FoldChange")), _number(row.get("padj")),
+             _number(row.get("lfc_ci_low")), _number(row.get("lfc_ci_high")),
+             row.get("regulation"), row.get("dataset_role")),
+        )
 
 
 def _insert_samples(connection, root: Path, run_id: str) -> None:
@@ -244,8 +331,10 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
     database_path = Path(database_path)
     if not database_path.is_absolute():
         database_path = root / database_path
-    inputs = _required_files(root)
-    input_hash = _sha256(inputs)
+    config = json.loads((root / "config/benchmark.json").read_text())
+    inputs = _required_files(root, config)
+    input_hash, hashes = _input_hashes(root, inputs)
+    release = json.loads((root / "results/regulatory_network/scoring_provenance.json").read_text())["regulondb_release"]
     run_id = f"run-{input_hash[:16]}"
     database_path.parent.mkdir(parents=True, exist_ok=True)
     temp_handle, temp_name = tempfile.mkstemp(prefix="promoter-discovery-", suffix=".sqlite", dir=database_path.parent)
@@ -255,16 +344,22 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
     try:
         connection = open_database(temp_path)
         with transaction(connection):
-            _insert_run(connection, run_id, input_hash)
+            _insert_run(connection, run_id, input_hash, hashes["config/benchmark.json"], release)
+            _insert_assets(connection, root, run_id, inputs, hashes, release)
             _insert_antibiotics(connection)
-            _insert_de(connection, root, run_id)
-            _insert_network(connection, root, run_id)
+            contrast_ids = _insert_de(connection, root, run_id, config)
+            _insert_pairwise(connection, root, run_id, config)
             _insert_samples(connection, root, run_id)
             _insert_promoters(connection, root)
             _insert_regulatory_sites(connection, root)
             _insert_candidates(connection, root, run_id)
+            _insert_candidate_evidence(connection, root, run_id, contrast_ids)
+            _insert_network(connection, root, run_id)
             _insert_assessment(connection, root, run_id)
+            if connection.execute("PRAGMA foreign_key_check").fetchone():
+                raise ValueError("Database contains broken foreign-key relationships")
             connection.execute("UPDATE analysis_runs SET status='complete', summary_json=? WHERE run_id=?", (json.dumps({"input_files": len(inputs)}), run_id))
+        connection.execute("PRAGMA journal_mode = DELETE")
         close_database(connection)
         connection = None
         os.replace(temp_path, database_path)
@@ -272,6 +367,8 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
         if connection is not None:
             connection.close()
         temp_path.unlink(missing_ok=True)
+        Path(f"{temp_path}-wal").unlink(missing_ok=True)
+        Path(f"{temp_path}-shm").unlink(missing_ok=True)
         raise
     return database_path
 
