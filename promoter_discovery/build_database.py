@@ -241,24 +241,41 @@ def _insert_samples(connection, root: Path, run_id: str) -> None:
         connection.execute("INSERT INTO sample_qc(run_id, study_id, sample_id, library_size, genes_detected, pc1, pc2) VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, study_id, sample_id, _number(row.get("library_counts")), _number(row.get("genes_detected")), _number(row.get("PC1")), _number(row.get("PC2"))))
 
 
-def _insert_promoters(connection, root: Path) -> None:
+def _insert_promoters(connection, root: Path, run_id: str) -> None:
     rows = _read_csv(root / "results/promoter_review/promoter_review.csv")
     for row in rows:
         promoter_id = row.get("promoter_id")
         if not promoter_id:
             continue
-        tu_id = (row.get("tu_ids") or "").split(";")[0] or None
+        tu_ids = [item for item in (row.get("tu_ids") or "").split(";") if item]
+        for tu_id in tu_ids:
+            connection.execute("INSERT OR IGNORE INTO transcription_units(tu_id, name, source_release) VALUES (?, ?, ?)", (tu_id, row.get("operon_name"), row.get("regulondb_release")))
+        connection.execute("INSERT INTO promoters(promoter_id, tu_id, name, start, end, strand, tss, sigma_factor, sequence, annotation_status, source_release) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (promoter_id, tu_ids[0] if tu_ids else None, row.get("promoter_name"), None, None, _strand(row.get("strand")), _number(row.get("tss")), row.get("sigma_factor"), row.get("annotated_sequence"), row.get("mapping_status") or "review", row.get("regulondb_release")))
+        for tu_id in tu_ids:
+            connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
+        for name in (row.get("candidate_genes") or "").split(";"):
+            gene_id = name.strip().lower()
+            if gene_id:
+                connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
+                connection.execute("INSERT OR IGNORE INTO promoter_genes(promoter_id, gene_id, relationship) VALUES (?, ?, 'candidate')", (promoter_id, gene_id))
+
+    for row in _read_csv(root / "results/promoter_review/candidate_promoter_mapping.csv"):
+        candidate_id = row["gene"].strip().lower()
+        tu_id = row.get("tu_id") or None
+        promoter_id = row.get("promoter_id") or None
         if tu_id:
             connection.execute("INSERT OR IGNORE INTO transcription_units(tu_id, name, source_release) VALUES (?, ?, ?)", (tu_id, row.get("operon_name"), row.get("regulondb_release")))
-        connection.execute("INSERT OR IGNORE INTO promoters(promoter_id, tu_id, name, start, end, strand, tss, sigma_factor, sequence, annotation_status, source_release) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (promoter_id, tu_id, row.get("promoter_name"), None, None, _strand(row.get("strand")), _number(row.get("tss")), row.get("sigma_factor"), row.get("annotated_sequence"), row.get("mapping_status") or "review", row.get("regulondb_release")))
-        for gene_id in (row.get("candidate_genes") or row.get("tu_genes") or "").split(";"):
-            if gene_id:
-                resolved = connection.execute("SELECT gene_id FROM genes WHERE gene_id = ? OR canonical_name = ? LIMIT 1", (gene_id, gene_id)).fetchone()
-                resolved_id = resolved[0] if resolved else gene_id
-                connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (resolved_id, gene_id))
-                connection.execute("INSERT OR IGNORE INTO promoter_genes(promoter_id, gene_id, relationship) VALUES (?, ?, ?)", (promoter_id, resolved_id, "candidate_or_tu"))
-        if tu_id:
-            connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
+            for order, name in enumerate((row.get("tu_genes") or "").split(";")):
+                gene_id = name.strip().lower()
+                if gene_id:
+                    connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
+                    connection.execute("INSERT OR IGNORE INTO tu_genes(tu_id, gene_id, gene_order) VALUES (?, ?, ?)", (tu_id, gene_id, order))
+            connection.execute("INSERT OR IGNORE INTO candidate_tus(run_id, candidate_id, tu_id) VALUES (?, ?, ?)", (run_id, candidate_id, tu_id))
+        if promoter_id:
+            if tu_id:
+                connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
+            connection.execute("INSERT OR IGNORE INTO candidate_promoters(run_id, candidate_id, promoter_id) VALUES (?, ?, ?)", (run_id, candidate_id, promoter_id))
+            connection.execute("INSERT OR IGNORE INTO promoter_genes(promoter_id, gene_id, relationship) VALUES (?, ?, 'candidate')", (promoter_id, candidate_id))
 
 
 def _insert_candidates(connection, root: Path, run_id: str) -> None:
@@ -269,13 +286,15 @@ def _insert_candidates(connection, root: Path, run_id: str) -> None:
         if not candidate_id:
             continue
         connection.execute("INSERT OR IGNORE INTO candidates(candidate_id, run_id, gene_id, promoter_id, antibiotic_class, support_tier, ranking_score, response_summary_json, review_flags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (candidate_id, run_id, candidate_id, row.get("promoter_id") or None, row.get("shortlist_class") or row.get("group") or "unknown", row.get("class_support_tier") or row.get("evidence_tier"), _number(row.get("class_max_abs_log2_fold_change") or row.get("max_abs_log2_fold_change")), _json(row.get("response_profile_json")), _json(row.get("evidence_quality_flags"))))
+
+
+def _insert_panel(connection, root: Path, run_id: str) -> None:
     panel_path = root / "results/candidate_assessment/experimental_panel.csv"
-    if panel_path.exists():
-        for row in _read_csv(panel_path):
-            candidate_id = row.get("gene")
-            if not candidate_id:
-                continue
-            connection.execute("INSERT OR IGNORE INTO candidate_panels(run_id, panel_id, candidate_id, promoter_id, antibiotic_class, selection_order, selection_rationale, transcription_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (run_id, "experimental_panel", candidate_id, row.get("promoter_id") or None, row.get("antibiotic_class") or "unknown", _number(row.get("selection_order")), row.get("selection_basis"), row.get("transcription_group") or None))
+    for row in _read_csv(panel_path):
+        candidate_id = row.get("gene")
+        if not candidate_id:
+            continue
+        connection.execute("INSERT INTO candidate_panels(run_id, panel_id, candidate_id, promoter_id, antibiotic_class, selection_order, selection_rationale, transcription_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (run_id, "experimental_panel", candidate_id, row.get("promoter_id") or None, row.get("antibiotic_class") or "unknown", _number(row.get("selection_order")), row.get("selection_basis"), row.get("transcription_group") or None))
 
 
 def _insert_assessment(connection, root: Path, run_id: str) -> None:
@@ -300,30 +319,36 @@ def _insert_regulatory_sites(connection, root: Path) -> None:
         connection.execute("INSERT OR IGNORE INTO regulatory_sites(site_id, promoter_id, regulator_id, start, end, strand, sequence, function, evidence, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (row.get("id"), promoter_id, regulator_id, _number(row.get("tfrsLeft")), _number(row.get("tfrsRight")), _strand(row.get("strand")), row.get("tfrsSeq"), row.get("riFunction"), row.get("tfrsEvidence"), row.get("confidenceLevel")))
 
 
-def _insert_network(connection, root: Path, run_id: str) -> None:
-    """Import the serialized graph when its optional network dependency exists."""
+def _insert_network(connection, root: Path, run_id: str, release: str) -> None:
+    """Import every regulatory edge from the saved full-reference graph."""
     path = root / "results/regulatory_network/regulatory_network.pkl"
-    if not path.exists():
-        return
     try:
         with path.open("rb") as handle:
             graph = pickle.load(handle)
-    except (ImportError, ModuleNotFoundError, AttributeError, EOFError, pickle.UnpicklingError):
-        return
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise RuntimeError("Network import requires networkx; install requirements.txt") from exc
+    if graph.graph.get("network_scope") != "full_reference":
+        raise ValueError("Expected the full-reference regulatory graph")
     regulator_nodes = set()
     for node, attrs in graph.nodes(data=True):
+        node = str(node)
         node_type = str(attrs.get("node_type", "")).lower()
+        connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name, locus_tag) VALUES (?, ?, ?)", (node, attrs.get("canonical_gene") or node, attrs.get("canonical_locus_tag") or None))
         if attrs.get("is_regulator") or node_type in {"regulator", "sigma"}:
-            regulator_nodes.add(str(node))
-            connection.execute("INSERT OR IGNORE INTO regulators(regulator_id, name, regulator_type) VALUES (?, ?, ?)", (str(node), attrs.get("label") or attrs.get("canonical_gene") or str(node), attrs.get("regulator_type") or node_type or "regulator"))
-        else:
-            connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name, locus_tag) VALUES (?, ?, ?)", (str(node), attrs.get("canonical_gene") or str(node), attrs.get("canonical_locus_tag")))
+            regulator_nodes.add(node)
+            connection.execute("INSERT OR IGNORE INTO regulators(regulator_id, name, regulator_type, source_release) VALUES (?, ?, ?, ?)", (node, attrs.get("label") or attrs.get("canonical_gene") or node, attrs.get("regulator_type") or node_type or "regulator", release))
     for source, target, attrs in graph.edges(data=True):
         source, target = str(source), str(target)
-        if source not in regulator_nodes:
+        edge_type = attrs.get("edge_type")
+        if edge_type not in {"activates", "represses", "dual"}:
             continue
-        edge_id = hashlib.sha256(f"{run_id}:{source}:{target}:{attrs}".encode()).hexdigest()[:24]
-        connection.execute("INSERT OR IGNORE INTO regulatory_edges(edge_id, run_id, regulator_id, target_gene_id, edge_type, effect, evidence, confidence, source_release, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (edge_id, run_id, source, target, attrs.get("edge_type") or attrs.get("type") or "regulatory", attrs.get("effect"), attrs.get("evidence"), attrs.get("confidence"), attrs.get("source_release") or "RegulonDB 14.5.0", json.dumps(attrs, default=str)))
+        if source not in regulator_nodes:
+            raise ValueError(f"Regulatory edge source {source!r} is not a regulator")
+        edge_id = hashlib.sha256(f"{run_id}:{source}:{target}:{edge_type}".encode()).hexdigest()[:24]
+        connection.execute("INSERT INTO regulatory_edges(edge_id, run_id, regulator_id, target_gene_id, edge_type, effect, evidence, confidence, source_release, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (edge_id, run_id, source, target, edge_type, edge_type, json.dumps(attrs.get("interaction_evidence", []), default=str), attrs.get("confidence"), release, json.dumps(attrs, default=str)))
+    count = connection.execute("SELECT COUNT(*) FROM regulatory_edges WHERE run_id = ?", (run_id,)).fetchone()[0]
+    if not count:
+        raise ValueError("The full-reference graph contains no regulatory edges")
 
 
 def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_DATABASE) -> Path:
@@ -350,11 +375,12 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
             contrast_ids = _insert_de(connection, root, run_id, config)
             _insert_pairwise(connection, root, run_id, config)
             _insert_samples(connection, root, run_id)
-            _insert_promoters(connection, root)
-            _insert_regulatory_sites(connection, root)
             _insert_candidates(connection, root, run_id)
+            _insert_promoters(connection, root, run_id)
+            _insert_panel(connection, root, run_id)
+            _insert_regulatory_sites(connection, root)
             _insert_candidate_evidence(connection, root, run_id, contrast_ids)
-            _insert_network(connection, root, run_id)
+            _insert_network(connection, root, run_id, release)
             _insert_assessment(connection, root, run_id)
             if connection.execute("PRAGMA foreign_key_check").fetchone():
                 raise ValueError("Database contains broken foreign-key relationships")

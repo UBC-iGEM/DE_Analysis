@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,14 +41,21 @@ class Database:
             clauses.append("c.run_id = ?")
             parameters.append(run_id)
         if padj_max is not None or effect_min is not None:
-            clauses.append("EXISTS (SELECT 1 FROM candidate_evidence e WHERE e.run_id = c.run_id AND e.candidate_id = c.candidate_id")
+            evidence_clauses = [
+                "e.run_id = c.run_id",
+                "e.candidate_id = c.candidate_id",
+                "e.evidence_role = 'discovery'",
+            ]
             if padj_max is not None:
-                clauses.append("e.padj <= ?")
+                evidence_clauses.append("e.padj <= ?")
                 parameters.append(padj_max)
             if effect_min is not None:
-                clauses.append("ABS(e.effect) >= ?")
+                evidence_clauses.append("ABS(e.effect) >= ?")
                 parameters.append(effect_min)
-            clauses.append(")")
+            clauses.append(
+                "EXISTS (SELECT 1 FROM candidate_evidence e WHERE "
+                + " AND ".join(evidence_clauses) + ")"
+            )
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         return self._rows("SELECT * FROM candidate_summary c" + where + " ORDER BY c.ranking_score DESC NULLS LAST", parameters)
 
@@ -60,6 +66,16 @@ class Database:
         result = rows[0]
         result["evidence"] = self._rows("SELECT * FROM candidate_evidence WHERE run_id = ? AND candidate_id = ? ORDER BY padj", (result["run_id"], candidate_id))
         result["regulators"] = self._rows("SELECT DISTINCT r.* FROM regulatory_edges e JOIN regulators r ON r.regulator_id = e.regulator_id WHERE e.run_id = ? AND e.target_gene_id = ?", (result["run_id"], result["gene_id"]))
+        result["transcription_units"] = self._rows(
+            "SELECT tu.* FROM candidate_tus ct JOIN transcription_units tu ON tu.tu_id = ct.tu_id "
+            "WHERE ct.run_id = ? AND ct.candidate_id = ? ORDER BY tu.tu_id",
+            (result["run_id"], candidate_id),
+        )
+        result["promoters"] = self._rows(
+            "SELECT p.* FROM candidate_promoters cp JOIN promoters p ON p.promoter_id = cp.promoter_id "
+            "WHERE cp.run_id = ? AND cp.candidate_id = ? ORDER BY p.promoter_id",
+            (result["run_id"], candidate_id),
+        )
         return result
 
     def search_regulator(self, regulator: str) -> list[dict]:
