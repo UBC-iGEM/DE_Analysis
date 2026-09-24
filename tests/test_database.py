@@ -102,6 +102,7 @@ def test_panel_rejects_duplicate_promoter_and_transcription_group(tmp_path):
     connection = open_database(tmp_path / "project.sqlite")
     connection.execute("INSERT INTO analysis_runs(run_id, created_at, status) VALUES ('run-1', 'now', 'complete')")
     connection.execute("INSERT INTO genes(gene_id) VALUES ('b0001'), ('b0002')")
+    connection.execute("INSERT INTO promoters(promoter_id) VALUES ('p1'), ('p2')")
     connection.execute("INSERT INTO candidates(candidate_id, run_id, gene_id, antibiotic_class) VALUES ('c1', 'run-1', 'b0001', 'beta_lactam'), ('c2', 'run-1', 'b0002', 'beta_lactam')")
     connection.execute("INSERT INTO candidate_panels(run_id, panel_id, candidate_id, promoter_id, antibiotic_class, transcription_group) VALUES ('run-1', 'panel-1', 'c1', 'p1', 'beta_lactam', 'tu1')")
     with pytest.raises(sqlite3.IntegrityError):

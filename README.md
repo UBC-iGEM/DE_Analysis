@@ -110,6 +110,13 @@ python -m promoter_discovery.db_cli --json candidate gfcc
 python -m promoter_discovery.db_cli --json panel
 ```
 
+The database includes the five drug/control and ten direct drug/drug contrasts.
+Candidate evidence links back to individual measured genes, including names
+with multiple locus tags. Candidate searches with an effect or adjusted-p-value
+filter use discovery comparisons; challenge responses remain available in each
+candidate's full evidence. The saved full-reference graph is required for a
+complete database build.
+
 Use `--skip-database` on `assess_candidates` when only the assessment files are
 needed; `build_database` remains available for an explicit rebuild.
 

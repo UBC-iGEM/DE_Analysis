@@ -33,3 +33,5 @@ The custom per-dataset runner writes diagnostic outputs to `custom_analysis/`.
 Search the generated database with `python -m promoter_discovery.db_cli` or use
 `promoter_discovery.db_api.Database` from Python. The CSV, JSON, and FASTA files
 remain the reproducible source artifacts; the SQLite file is rebuilt from them.
+The importer records hashes of its source files and requires the full regulatory
+graph so a missing graph cannot appear as a valid database with zero edges.

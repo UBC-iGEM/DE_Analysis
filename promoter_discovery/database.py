@@ -438,7 +438,11 @@ def open_database(path: str | Path = DEFAULT_DATABASE) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA journal_mode = WAL")
-    initialize_schema(connection)
+    try:
+        initialize_schema(connection)
+    except Exception:
+        connection.close()
+        raise
     return connection
 
 
