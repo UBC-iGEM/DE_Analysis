@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -219,13 +219,32 @@ CREATE TABLE IF NOT EXISTS candidate_evidence (
     run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
     candidate_id TEXT NOT NULL,
     contrast_id TEXT NOT NULL REFERENCES contrasts(contrast_id),
+    source_gene_id TEXT NOT NULL REFERENCES genes(gene_id),
     effect REAL,
     padj REAL,
     ci_low REAL,
     ci_high REAL,
     direction TEXT,
     evidence_role TEXT,
-    PRIMARY KEY (run_id, candidate_id, contrast_id),
+    PRIMARY KEY (run_id, candidate_id, contrast_id, source_gene_id),
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id),
+    FOREIGN KEY (run_id, contrast_id, source_gene_id)
+        REFERENCES de_results(run_id, contrast_id, gene_id)
+);
+
+CREATE TABLE IF NOT EXISTS candidate_tus (
+    run_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    tu_id TEXT NOT NULL REFERENCES transcription_units(tu_id),
+    PRIMARY KEY (run_id, candidate_id, tu_id),
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
+);
+
+CREATE TABLE IF NOT EXISTS candidate_promoters (
+    run_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    promoter_id TEXT NOT NULL REFERENCES promoters(promoter_id),
+    PRIMARY KEY (run_id, candidate_id, promoter_id),
     FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
 );
 
@@ -346,6 +365,8 @@ CREATE INDEX IF NOT EXISTS idx_tu_promoters_promoter ON tu_promoters(promoter_id
 CREATE INDEX IF NOT EXISTS idx_candidates_class ON candidates(antibiotic_class, support_tier);
 CREATE INDEX IF NOT EXISTS idx_candidates_gene ON candidates(gene_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_contrast ON candidate_evidence(contrast_id, padj);
+CREATE INDEX IF NOT EXISTS idx_candidate_tus_tu ON candidate_tus(tu_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_promoters_promoter ON candidate_promoters(promoter_id);
 CREATE INDEX IF NOT EXISTS idx_panel_class ON candidate_panels(panel_id, antibiotic_class);
 CREATE INDEX IF NOT EXISTS idx_qc_sample ON sample_qc(sample_id);
 CREATE INDEX IF NOT EXISTS idx_replicates_candidate ON replicate_metrics(candidate_id, contrast_id);
@@ -360,6 +381,7 @@ CREATE VIEW IF NOT EXISTS candidate_summary AS
 SELECT c.run_id, c.candidate_id, c.gene_id, g.canonical_name, c.promoter_id,
        c.antibiotic_class, c.support_tier, c.ranking_score, c.status,
        p.name AS promoter_name, p.tss, p.sigma_factor, p.annotation_status,
+       (SELECT COUNT(*) FROM candidate_promoters cp WHERE cp.run_id = c.run_id AND cp.candidate_id = c.candidate_id) AS promoter_count,
        cr.review_status, cr.priority, cr.construct_ready, cr.notes AS review_notes
 FROM candidates c
 JOIN genes g ON g.gene_id = c.gene_id
@@ -389,11 +411,16 @@ LEFT JOIN fragment_reviews f ON f.run_id = p.run_id AND f.promoter_id = p.promot
 CREATE VIEW IF NOT EXISTS regulator_candidate_paths AS
 SELECT e.run_id, e.regulator_id, r.name AS regulator_name,
        e.target_gene_id AS gene_id, g.canonical_name, c.candidate_id,
-       c.antibiotic_class, c.promoter_id
+       c.antibiotic_class, cp.promoter_id, ct.tu_id
 FROM regulatory_edges e
 JOIN regulators r ON r.regulator_id = e.regulator_id
 JOIN genes g ON g.gene_id = e.target_gene_id
-LEFT JOIN candidates c ON c.run_id = e.run_id AND c.gene_id = e.target_gene_id;
+LEFT JOIN candidates c ON c.run_id = e.run_id AND c.gene_id = e.target_gene_id
+LEFT JOIN candidate_tus ct ON ct.run_id = c.run_id AND ct.candidate_id = c.candidate_id
+LEFT JOIN candidate_promoters cp ON cp.run_id = c.run_id AND cp.candidate_id = c.candidate_id
+    AND (ct.tu_id IS NULL OR EXISTS (
+        SELECT 1 FROM tu_promoters tp WHERE tp.tu_id = ct.tu_id AND tp.promoter_id = cp.promoter_id
+    ));
 
 CREATE VIEW IF NOT EXISTS sample_qc_summary AS
 SELECT q.run_id, q.sample_id, s.condition, s.source_file,
@@ -417,6 +444,17 @@ def open_database(path: str | Path = DEFAULT_DATABASE) -> sqlite3.Connection:
 
 def initialize_schema(connection: sqlite3.Connection) -> None:
     """Create the current schema without deleting existing records."""
+    existing = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'database_metadata'"
+    ).fetchone()
+    if existing:
+        row = connection.execute(
+            "SELECT value FROM database_metadata WHERE key = 'schema_version'"
+        ).fetchone()
+        if row and int(row[0]) != SCHEMA_VERSION:
+            raise ValueError(
+                f"Database schema {row[0]} is unsupported; rebuild the generated database"
+            )
     connection.executescript(SCHEMA_SQL)
     connection.execute(
         "INSERT OR REPLACE INTO database_metadata(key, value) VALUES (?, ?)",

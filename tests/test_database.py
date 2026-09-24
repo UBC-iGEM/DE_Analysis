@@ -122,3 +122,29 @@ def test_qc_and_fragment_reviews_require_valid_source_entities(tmp_path):
     assert connection.execute("SELECT COUNT(*) FROM sample_qc").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM fragment_reviews WHERE sequence_match = 1").fetchone()[0] == 1
     close_database(connection)
+
+
+def test_candidate_evidence_preserves_two_loci_and_requires_matching_de_rows(tmp_path):
+    connection = open_database(tmp_path / "project.sqlite")
+    connection.execute("INSERT INTO analysis_runs(run_id, created_at, status) VALUES ('run-1', 'now', 'complete')")
+    connection.execute("INSERT INTO genes(gene_id) VALUES ('insi2'), ('b4284'), ('b4708')")
+    connection.execute("INSERT INTO contrasts(contrast_id, run_id, name, numerator, denominator, comparison_type) VALUES ('drug', 'run-1', 'drug_vs_water', 'drug', 'water', 'drug_control')")
+    connection.execute("INSERT INTO candidates(run_id, candidate_id, gene_id, antibiotic_class) VALUES ('run-1', 'insi2', 'insi2', 'aminoglycoside')")
+    for locus in ('b4284', 'b4708'):
+        connection.execute("INSERT INTO de_results(run_id, contrast_id, gene_id) VALUES ('run-1', 'drug', ?)", (locus,))
+        connection.execute("INSERT INTO candidate_evidence(run_id, candidate_id, contrast_id, source_gene_id) VALUES ('run-1', 'insi2', 'drug', ?)", (locus,))
+    assert connection.execute("SELECT COUNT(*) FROM candidate_evidence").fetchone()[0] == 2
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("INSERT INTO candidate_evidence(run_id, candidate_id, contrast_id, source_gene_id) VALUES ('run-1', 'insi2', 'drug', 'insi2')")
+    close_database(connection)
+
+
+def test_old_generated_schema_is_not_silently_relabelled(tmp_path):
+    path = tmp_path / "old.sqlite"
+    connection = sqlite3.connect(path)
+    connection.execute("CREATE TABLE database_metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    connection.execute("INSERT INTO database_metadata VALUES ('schema_version', '7')")
+    connection.commit()
+    connection.close()
+    with pytest.raises(ValueError, match="rebuild the generated database"):
+        open_database(path)
