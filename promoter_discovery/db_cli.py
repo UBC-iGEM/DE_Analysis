@@ -43,6 +43,15 @@ def main(argv=None) -> None:
     regulator = subparsers.add_parser("regulator", help="show regulator-to-candidate paths")
     regulator.add_argument("regulator")
 
+    interactions = subparsers.add_parser("interactions", help="show curated reference interactions for an actor")
+    interactions.add_argument("actor")
+    interactions.add_argument("--target-kind", choices=("promoter", "tu", "gene"))
+    interactions.add_argument("--run-id")
+
+    paths = subparsers.add_parser("promoter-paths", help="show reference actor-to-promoter-to-gene paths")
+    paths.add_argument("actor")
+    paths.add_argument("--run-id")
+
     panel = subparsers.add_parser("panel", help="show a selected panel")
     panel.add_argument("--panel-id", default="experimental_panel")
     panel.add_argument("--run-id")
@@ -60,6 +69,10 @@ def main(argv=None) -> None:
             rows = [result] if result else []
         elif args.command == "regulator":
             rows = database.search_regulator(args.regulator)
+        elif args.command == "interactions":
+            rows = database.reference_interactions(args.actor, args.target_kind, args.run_id)
+        elif args.command == "promoter-paths":
+            rows = database.reference_promoter_paths(args.actor, args.run_id)
         elif args.command == "panel":
             rows = database.panel(args.panel_id, args.run_id)
         else:

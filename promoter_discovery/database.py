@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -129,6 +129,40 @@ CREATE TABLE IF NOT EXISTS regulatory_sites (
     confidence TEXT,
     source_release TEXT,
     annotation_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS regulatory_actors (
+    actor_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    actor_type TEXT NOT NULL,
+    source_release TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS regulatory_interactions (
+    interaction_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    actor_id TEXT NOT NULL REFERENCES regulatory_actors(actor_id),
+    interaction_type TEXT NOT NULL,
+    target_kind TEXT NOT NULL CHECK (target_kind IN ('promoter', 'tu', 'gene')),
+    source_target_id TEXT,
+    promoter_id TEXT REFERENCES promoters(promoter_id),
+    tu_id TEXT REFERENCES transcription_units(tu_id),
+    gene_id TEXT REFERENCES genes(gene_id),
+    site_id TEXT REFERENCES regulatory_sites(site_id),
+    effect TEXT,
+    conformation TEXT,
+    confidence TEXT,
+    site_evidence TEXT,
+    interaction_evidence TEXT,
+    evidence_category TEXT,
+    pmids TEXT,
+    source_release TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    CHECK (
+        (target_kind = 'promoter' AND promoter_id IS NOT NULL AND tu_id IS NULL AND gene_id IS NULL) OR
+        (target_kind = 'tu' AND promoter_id IS NULL AND tu_id IS NOT NULL AND gene_id IS NULL) OR
+        (target_kind = 'gene' AND promoter_id IS NULL AND tu_id IS NULL AND gene_id IS NOT NULL)
+    )
 );
 
 CREATE TABLE IF NOT EXISTS contrasts (
@@ -355,6 +389,11 @@ CREATE INDEX IF NOT EXISTS idx_samples_condition ON samples(condition);
 CREATE INDEX IF NOT EXISTS idx_promoters_tu ON promoters(tu_id);
 CREATE INDEX IF NOT EXISTS idx_sites_promoter ON regulatory_sites(promoter_id);
 CREATE INDEX IF NOT EXISTS idx_sites_regulator ON regulatory_sites(regulator_id);
+CREATE INDEX IF NOT EXISTS idx_actors_name ON regulatory_actors(name);
+CREATE INDEX IF NOT EXISTS idx_interactions_actor ON regulatory_interactions(run_id, actor_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_promoter ON regulatory_interactions(run_id, promoter_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_tu ON regulatory_interactions(run_id, tu_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_gene ON regulatory_interactions(run_id, gene_id);
 CREATE INDEX IF NOT EXISTS idx_contrasts_run ON contrasts(run_id);
 CREATE INDEX IF NOT EXISTS idx_de_gene ON de_results(gene_id, contrast_id);
 CREATE INDEX IF NOT EXISTS idx_de_padj ON de_results(contrast_id, padj);
@@ -421,6 +460,19 @@ LEFT JOIN candidate_promoters cp ON cp.run_id = c.run_id AND cp.candidate_id = c
     AND (ct.tu_id IS NULL OR EXISTS (
         SELECT 1 FROM tu_promoters tp WHERE tp.tu_id = ct.tu_id AND tp.promoter_id = cp.promoter_id
     ));
+
+CREATE VIEW IF NOT EXISTS reference_promoter_paths AS
+SELECT ri.run_id, ri.interaction_id, ri.actor_id,
+       a.name AS actor_name, a.actor_type, ri.interaction_type, ri.effect,
+       ri.conformation, ri.confidence, ri.site_evidence,
+       ri.interaction_evidence, ri.pmids, ri.source_release, ri.site_id,
+       p.promoter_id, p.name AS promoter_name, tp.tu_id, tg.gene_id
+FROM regulatory_interactions ri
+JOIN regulatory_actors a ON a.actor_id = ri.actor_id
+JOIN promoters p ON p.promoter_id = ri.promoter_id
+LEFT JOIN tu_promoters tp ON tp.promoter_id = p.promoter_id
+LEFT JOIN tu_genes tg ON tg.tu_id = tp.tu_id
+WHERE ri.target_kind = 'promoter';
 
 CREATE VIEW IF NOT EXISTS sample_qc_summary AS
 SELECT q.run_id, q.sample_id, s.condition, s.source_file,

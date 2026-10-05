@@ -23,11 +23,23 @@ TARGETS = {
     "ciprofloxacin": ("cross_reactivity", "other", "challenge"),
     "polymyxin_e": ("cross_reactivity", "other", "challenge"),
 }
+REFERENCE_FILES = (
+    "data/references/regulondb/TUSet.tsv",
+    "data/references/regulondb/PromoterSet.tsv",
+    "data/references/regulondb/RISet.tsv",
+)
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _read_reference(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        reader.fieldnames = [name.split(")", 1)[-1].strip() for name in reader.fieldnames or []]
+        return [{key: value.strip() for key, value in row.items()} for row in reader]
 
 
 def _number(value: str | None, default=None):
@@ -92,10 +104,21 @@ def _required_files(root: Path, config: dict) -> list[Path]:
         results / "differential_expression/contrasts" / dataset["output_directory"] / "de_results.csv"
         for dataset in config["datasets"]
     )
+    files.extend(root / relative for relative in REFERENCE_FILES)
     missing = [path for path in files if not path.exists()]
     if missing:
         raise FileNotFoundError("Database inputs missing: " + ", ".join(map(str, missing)))
     return files
+
+
+def _verify_reference_files(root: Path, release: str) -> None:
+    lock = json.loads((root / "config/regulondb.lock.json").read_text())
+    records = {item.get("path"): item for item in lock.get("assets", {}).values()}
+    for relative in REFERENCE_FILES:
+        record = records.get(relative)
+        if (not record or record.get("regulondb_release") != release
+                or record.get("sha256") != _file_sha256(root / relative)):
+            raise ValueError(f"Reference is not verified by the {release} lock: {relative}")
 
 
 def _input_hashes(root: Path, files: Iterable[Path]) -> tuple[str, dict[str, str]]:
@@ -241,6 +264,80 @@ def _insert_samples(connection, root: Path, run_id: str) -> None:
         connection.execute("INSERT INTO sample_qc(run_id, study_id, sample_id, library_size, genes_detected, pc1, pc2) VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, study_id, sample_id, _number(row.get("library_counts")), _number(row.get("genes_detected")), _number(row.get("PC1")), _number(row.get("PC2"))))
 
 
+def _insert_reference_network(connection, root: Path, run_id: str, release: str) -> None:
+    """Keep every same-release interaction and its promoter/TU context."""
+    reference = root / "data/references/regulondb"
+    for row in _read_reference(reference / "PromoterSet.tsv"):
+        connection.execute(
+            "INSERT INTO promoters(promoter_id, name, genome_accession, strand, tss, sigma_factor, "
+            "sequence, annotation_status, source_release, annotation_json) "
+            "VALUES (?, ?, 'U00096.3', ?, ?, ?, ?, 'reference', ?, ?)",
+            (row["id"], row.get("name"), _strand(row.get("strand")), _number(row.get("posTSS")),
+             row.get("sigmaFactor"), row.get("sequence"), release, json.dumps(row)),
+        )
+    for row in _read_reference(reference / "TUSet.tsv"):
+        tu_id = row["id"]
+        connection.execute(
+            "INSERT INTO transcription_units(tu_id, name, source_release, annotation_json) VALUES (?, ?, ?, ?)",
+            (tu_id, row.get("name"), release, json.dumps(row)),
+        )
+        for order, name in enumerate((row.get("tuGenes") or "").split(";")):
+            gene_id = name.strip().lower()
+            if gene_id:
+                connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
+                connection.execute("INSERT OR IGNORE INTO tu_genes(tu_id, gene_id, gene_order) VALUES (?, ?, ?)", (tu_id, gene_id, order))
+        promoter_id = row.get("promoterId")
+        if promoter_id:
+            connection.execute("INSERT INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
+            connection.execute("UPDATE promoters SET tu_id = COALESCE(tu_id, ?) WHERE promoter_id = ?", (tu_id, promoter_id))
+
+    for row in _read_reference(reference / "RISet.tsv"):
+        interaction_type = row["type"]
+        actor_type, target_kind = interaction_type.split("-", 1)
+        target_kind = target_kind.lower()
+        actor_id = row["regulatorId"]
+        actor_name = row["regulatorName"]
+        connection.execute(
+            "INSERT OR IGNORE INTO regulatory_actors(actor_id, name, actor_type, source_release) VALUES (?, ?, ?, ?)",
+            (actor_id, actor_name, actor_type, release),
+        )
+        target = row.get("targetTuOrGene", "")
+        source_target_id, _, target_name = target.partition(":")
+        promoter_id = row.get("promoterID") if target_kind == "promoter" else None
+        if promoter_id:
+            source_target_id = promoter_id
+        tu_id = source_target_id if target_kind == "tu" else None
+        gene_id = (target_name or source_target_id).lower() if target_kind == "gene" else None
+        if gene_id:
+            connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
+        site_id = row.get("tfrsID") or None
+        if site_id:
+            regulator_id = actor_name.lower() if actor_type in {"TF", "regulator"} else None
+            if regulator_id:
+                connection.execute(
+                    "INSERT OR IGNORE INTO regulators(regulator_id, name, regulator_type, source_release) VALUES (?, ?, ?, ?)",
+                    (regulator_id, actor_name, actor_type, release),
+                )
+            connection.execute(
+                "INSERT OR IGNORE INTO regulatory_sites(site_id, promoter_id, regulator_id, start, end, strand, "
+                "sequence, function, evidence, confidence, source_release, annotation_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (site_id, row.get("promoterID") or None, regulator_id, _number(row.get("tfrsLeft")),
+                 _number(row.get("tfrsRight")), _strand(row.get("strand")), row.get("tfrsSeq"),
+                 row.get("riFunction"), row.get("tfrsEvidence"), row.get("confidenceLevel"), release, json.dumps(row)),
+            )
+        connection.execute(
+            "INSERT INTO regulatory_interactions(interaction_id, run_id, actor_id, interaction_type, target_kind, "
+            "source_target_id, promoter_id, tu_id, gene_id, site_id, effect, conformation, confidence, "
+            "site_evidence, interaction_evidence, evidence_category, pmids, source_release, source_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (row["id"], run_id, actor_id, interaction_type, target_kind, source_target_id or None,
+             promoter_id, tu_id, gene_id, site_id, row.get("riFunction"), row.get("cnfName"),
+             row.get("confidenceLevel"), row.get("tfrsEvidence"), row.get("riEvidence"),
+             row.get("riEvCategory"), row.get("riPMIDS"), release, json.dumps(row)),
+        )
+
+
 def _insert_promoters(connection, root: Path, run_id: str) -> None:
     rows = _read_csv(root / "results/promoter_review/promoter_review.csv")
     for row in rows:
@@ -250,7 +347,21 @@ def _insert_promoters(connection, root: Path, run_id: str) -> None:
         tu_ids = [item for item in (row.get("tu_ids") or "").split(";") if item]
         for tu_id in tu_ids:
             connection.execute("INSERT OR IGNORE INTO transcription_units(tu_id, name, source_release) VALUES (?, ?, ?)", (tu_id, row.get("operon_name"), row.get("regulondb_release")))
-        connection.execute("INSERT INTO promoters(promoter_id, tu_id, name, start, end, strand, tss, sigma_factor, sequence, annotation_status, source_release) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (promoter_id, tu_ids[0] if tu_ids else None, row.get("promoter_name"), None, None, _strand(row.get("strand")), _number(row.get("tss")), row.get("sigma_factor"), row.get("annotated_sequence"), row.get("mapping_status") or "review", row.get("regulondb_release")))
+        connection.execute(
+            "INSERT INTO promoters(promoter_id, tu_id, name, start, end, strand, tss, sigma_factor, sequence, annotation_status, source_release) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(promoter_id) DO UPDATE SET "
+            "tu_id=COALESCE(excluded.tu_id, promoters.tu_id), "
+            "name=COALESCE(excluded.name, promoters.name), "
+            "strand=COALESCE(excluded.strand, promoters.strand), "
+            "tss=COALESCE(excluded.tss, promoters.tss), "
+            "sigma_factor=COALESCE(excluded.sigma_factor, promoters.sigma_factor), "
+            "sequence=COALESCE(excluded.sequence, promoters.sequence), "
+            "annotation_status=excluded.annotation_status",
+            (promoter_id, tu_ids[0] if tu_ids else None, row.get("promoter_name"), None, None,
+             _strand(row.get("strand")), _number(row.get("tss")), row.get("sigma_factor"),
+             row.get("annotated_sequence"), row.get("mapping_status") or "review", row.get("regulondb_release")),
+        )
         for tu_id in tu_ids:
             connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
         for name in (row.get("candidate_genes") or "").split(";"):
@@ -358,8 +469,9 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
         database_path = root / database_path
     config = json.loads((root / "config/benchmark.json").read_text())
     inputs = _required_files(root, config)
-    input_hash, hashes = _input_hashes(root, inputs)
     release = json.loads((root / "results/regulatory_network/scoring_provenance.json").read_text())["regulondb_release"]
+    _verify_reference_files(root, release)
+    input_hash, hashes = _input_hashes(root, inputs)
     run_id = f"run-{input_hash[:16]}"
     database_path.parent.mkdir(parents=True, exist_ok=True)
     temp_handle, temp_name = tempfile.mkstemp(prefix="promoter-discovery-", suffix=".sqlite", dir=database_path.parent)
@@ -375,6 +487,7 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
             contrast_ids = _insert_de(connection, root, run_id, config)
             _insert_pairwise(connection, root, run_id, config)
             _insert_samples(connection, root, run_id)
+            _insert_reference_network(connection, root, run_id, release)
             _insert_candidates(connection, root, run_id)
             _insert_promoters(connection, root, run_id)
             _insert_panel(connection, root, run_id)

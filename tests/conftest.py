@@ -1,6 +1,7 @@
 """Small, self-contained pipeline outputs for database integration tests."""
 
 import csv
+import hashlib
 import json
 import pickle
 
@@ -12,6 +13,14 @@ def _write_csv(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_tsv(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), delimiter="\t")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -117,4 +126,40 @@ def database_root(tmp_path):
          "tfrsRight": 98, "strand": "forward", "tfrsSeq": "ACGT",
          "riFunction": "activator", "tfrsEvidence": "curated", "confidenceLevel": "S"}
     ])
+    reference = root / "data/references/regulondb"
+    _write_tsv(reference / "PromoterSet.tsv", [
+        {"1)id": promoter, "2)name": name, "3)strand": "forward", "4)posTSS": tss,
+         "5)sigmaFactor": "sigma70", "6)sequence": "ACGT", "7)confidenceLevel": "S"}
+        for promoter, name, tss in (("P1", "pA", 100), ("P2", "pB", 200))
+    ])
+    _write_tsv(reference / "TUSet.tsv", [
+        {"1)id": tu, "2)name": name, "3)tuGenes": genes, "4)promoterId": promoter,
+         "5)confidenceLevel": "S"}
+        for tu, name, genes, promoter in (("T1", "operonA", "GeneA;GeneB", "P1"),
+                                          ("T2", "operonB", "GeneC", "P2"))
+    ])
+    _write_tsv(reference / "RISet.tsv", [
+        {"1)id": interaction, "2)type": "TF-promoter", "3)regulatorId": "R1",
+         "4)regulatorName": "CRP", "5)cnfName": "CRP-cAMP", "6)tfrsID": site,
+         "7)tfrsLeft": left, "8)tfrsRight": left + 5, "9)strand": "forward",
+         "10)tfrsSeq": "ACGT", "11)riFunction": effect, "12)promoterID": promoter,
+         "13)promoterName": name, "14)tss": tss, "15)sigmaF": "sigma70",
+         "16)tfrsDistToPm": -20, "17)firstGene": gene,
+         "18)tfrsDistTo1Gene": -30, "19)targetTuOrGene": f"{tu}:{gene}",
+         "20)confidenceLevel": "S", "21)tfrsEvidence": "binding",
+         "22)riEvidence": "expression", "23)addEvidence": "",
+         "24)riEvTech": "binding", "25)riEvCategory": "classical",
+         "26)tfrsPMIDS": "1", "27)riPMIDS": "2"}
+        for interaction, site, left, effect, promoter, name, tss, tu, gene in (
+            ("I1", "S1", 90, "activator", "P1", "pA", 100, "T1", "GeneA"),
+            ("I2", "S2", 190, "repressor", "P2", "pB", 200, "T2", "GeneC"),
+        )
+    ])
+    lock = {"assets": {}}
+    for filename in ("TUSet.tsv", "PromoterSet.tsv", "RISet.tsv"):
+        path = reference / filename
+        relative = path.relative_to(root).as_posix()
+        lock["assets"][filename] = {"path": relative, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                                    "regulondb_release": "14.5.0"}
+    (root / "config/regulondb.lock.json").write_text(json.dumps(lock))
     return root

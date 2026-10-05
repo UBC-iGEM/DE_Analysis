@@ -81,6 +81,39 @@ class Database:
     def search_regulator(self, regulator: str) -> list[dict]:
         return self._rows("SELECT * FROM regulator_candidate_paths WHERE regulator_id = ? OR regulator_name = ? ORDER BY antibiotic_class, candidate_id", (regulator, regulator))
 
+    def reference_interactions(
+        self, actor: str, target_kind: str | None = None, run_id: str | None = None
+    ) -> list[dict]:
+        """Return individual curated interactions for an actor name or source ID."""
+        if target_kind is not None and target_kind not in {"promoter", "tu", "gene"}:
+            raise ValueError("target_kind must be promoter, tu, or gene")
+        query = (
+            "SELECT ri.interaction_id, ri.run_id, a.actor_id, a.name AS actor_name, a.actor_type, "
+            "ri.interaction_type, ri.target_kind, "
+            "COALESCE(ri.promoter_id, ri.tu_id, ri.gene_id) AS target_id, "
+            "ri.site_id, ri.effect, ri.conformation, ri.confidence, ri.site_evidence, "
+            "ri.interaction_evidence, ri.evidence_category, ri.pmids, ri.source_release "
+            "FROM regulatory_interactions ri JOIN regulatory_actors a ON a.actor_id = ri.actor_id "
+            "WHERE (lower(a.actor_id) = lower(?) OR lower(a.name) = lower(?))"
+        )
+        parameters: list[object] = [actor, actor]
+        if target_kind:
+            query += " AND ri.target_kind = ?"
+            parameters.append(target_kind)
+        if run_id:
+            query += " AND ri.run_id = ?"
+            parameters.append(run_id)
+        return self._rows(query + " ORDER BY ri.target_kind, target_id, ri.interaction_id", parameters)
+
+    def reference_promoter_paths(self, actor: str, run_id: str | None = None) -> list[dict]:
+        """Find curated actor-to-promoter paths across the full reference."""
+        query = "SELECT * FROM reference_promoter_paths WHERE (lower(actor_id) = lower(?) OR lower(actor_name) = lower(?))"
+        parameters: list[object] = [actor, actor]
+        if run_id:
+            query += " AND run_id = ?"
+            parameters.append(run_id)
+        return self._rows(query + " ORDER BY promoter_id, tu_id, gene_id, interaction_id", parameters)
+
     def panel(self, panel_id: str = "experimental_panel", run_id: str | None = None) -> list[dict]:
         query = "SELECT * FROM panel_review WHERE panel_id = ?"
         parameters: list[object] = [panel_id]

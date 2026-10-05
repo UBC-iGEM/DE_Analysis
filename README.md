@@ -101,13 +101,19 @@ wet-lab measurements establish transfer to the actual four antibiotics.
 
 The generated SQLite database is written to `results/promoter_discovery.sqlite`
 after candidate assessment. It indexes the DE, regulatory, promoter, candidate,
-panel, QC, and fragment-review outputs without replacing the source files. Use
+panel, QC, and fragment-review outputs without replacing the source files. It
+also imports the full locked RegulonDB promoter, transcription-unit, and
+interaction sets. Individual interactions retain their target type, effect,
+site, evidence, and source release; the existing gene-level network remains a
+summary for candidate analysis. Use
 the Python API (`promoter_discovery.db_api.Database`) or the search CLI:
 
 ```bash
 python -m promoter_discovery.db_cli candidates --class beta_lactam
 python -m promoter_discovery.db_cli --json candidate gfcc
 python -m promoter_discovery.db_cli --json panel
+python -m promoter_discovery.db_cli --json interactions CRP --target-kind promoter
+python -m promoter_discovery.db_cli --json promoter-paths CRP
 ```
 
 The database includes the five drug/control and ten direct drug/drug contrasts.
