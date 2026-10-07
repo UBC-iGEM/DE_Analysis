@@ -114,7 +114,53 @@ python -m promoter_discovery.db_cli --json candidate gfcc
 python -m promoter_discovery.db_cli --json panel
 python -m promoter_discovery.db_cli --json interactions CRP --target-kind promoter
 python -m promoter_discovery.db_cli --json promoter-paths CRP
+python -m promoter_discovery.db_cli --json network pdhr
+python -m promoter_discovery.db_cli --json coverage
 ```
+
+Launch the local browser interface with:
+
+```bash
+python -m promoter_discovery.explorer
+```
+
+Open **http://127.0.0.1:8000**. Search by gene name, antibiotic class, adjusted
+p-value, or effect size, or open the proposed panel. Select a candidate to see
+its measured responses, sequences, fragment checks, and regulatory graph.
+Select a solid graph edge to inspect its evidence. The explorer uses the
+existing database and requires only Python's standard library; use
+`--database <path>` or `--port 8001` to select another database or local port.
+
+Reference paths include promoter-, TU-, and gene-target interactions. Solid
+graph edges point to the actual curated target. Dashed edges show promoter/TU
+associations and TU membership. A TU- or gene-target interaction does not
+establish direct regulation of an associated promoter. Missing promoter links
+remain in query results and are counted in the coverage report. A gene-target
+effect is not assigned to sibling genes in the same TU. Queries default to the
+latest completed run; `--run-id` selects a particular run.
+
+Manual reviews are versioned in the persistent companion file
+`results/promoter_discovery.curation.sqlite`. Keep and back up this file when
+cleaning generated results. Rebuilding restores reviews for an identical run;
+changed input files create a new run whose approvals must be reviewed again.
+Earlier annotations remain searchable in the companion archive. Existing
+schema-9 reviews are archived during the upgrade. The companion is created
+when a review is first saved or an existing review is preserved.
+
+```bash
+# Get the run ID from the candidate record, then append a review.
+python -m promoter_discovery.db_cli --json candidate pdhr
+python -m promoter_discovery.db_cli review-candidate pdhr reviewed \
+  --run-id <run-id> --editor "Your name" --reason "Reviewed source evidence"
+python -m promoter_discovery.db_cli --json history candidate pdhr
+```
+
+`review-promoter <promoter-id> <status>` records boundary and construct reviews
+with the same editor, reason, and run fields. Candidate review statuses are
+`proposed`, `reviewed`, `approved`, and `excluded`; promoter statuses are
+`review`, `validated`, `ready_for_order`, and `excluded`. Optional notes,
+priority (candidates), construct readiness, and source references are retained
+with each revision. Scientific measurements remain in the imported tables.
 
 The database includes the five drug/control and ten direct drug/drug contrasts.
 Candidate evidence links back to individual measured genes, including names

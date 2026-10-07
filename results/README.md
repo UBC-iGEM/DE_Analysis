@@ -12,6 +12,7 @@ commands in the [project README](../README.md).
 | `promoter_review/` | `candidate_promoter_mapping.csv` and grouped `promoter_review.csv` |
 | `candidate_assessment/` | QC and panel figures, replicate summaries, screening stability, cross-reactivity, operon support, proposed fragments, and `experimental_panel.csv` |
 | `promoter_discovery.sqlite` | Generated SQLite query layer linking DE, network, promoter, candidate, panel, QC, and fragment-review records |
+| `promoter_discovery.curation.sqlite` | Persistent user review history; keep this file when cleaning generated outputs |
 
 Start with the two class shortlists, then review the promoter table. Class lists
 can overlap. The benchmark uses class proxies for the four wet-lab antibiotics;
@@ -35,3 +36,13 @@ Search the generated database with `python -m promoter_discovery.db_cli` or use
 remain the reproducible source artifacts; the SQLite file is rebuilt from them.
 The importer records hashes of its source files and requires the full regulatory
 graph so a missing graph cannot appear as a valid database with zero edges.
+
+Run `python -m promoter_discovery.explorer` and open http://127.0.0.1:8000 for
+candidate searches, response tables, promoter sequences, and local regulatory
+graphs. Solid edges show curated regulation of the recorded target; dashed
+edges show annotated membership. Unmapped promoter context remains reviewable.
+The database includes a source-validated reference coverage report.
+
+The companion curation file is created when reviews are saved. Back it up
+alongside the scientific artifacts: an identical-run rebuild restores reviews,
+while a changed run retains earlier history without applying old approvals.
