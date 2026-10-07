@@ -145,15 +145,23 @@ class Database:
 
     def candidate_paths(self, candidate_id: str, run_id: str | None = None) -> list[dict]:
         """Gene-target effects apply to that gene, never to siblings in its TU."""
+        run_id = self._run_id(run_id)
+        candidate = self.connection.execute(
+            "SELECT candidate_id, gene_id FROM candidates WHERE lower(candidate_id)=lower(?) AND run_id=?",
+            (candidate_id, run_id),
+        ).fetchone()
+        if candidate is None:
+            return []
         return self._rows(
-            "SELECT DISTINCT p.* FROM reference_regulatory_paths p JOIN candidates c ON c.run_id=p.run_id "
-            "WHERE lower(c.candidate_id)=lower(?) AND c.run_id=? AND (p.gene_id=c.gene_id OR "
-            "(p.target_kind='promoter' AND EXISTS (SELECT 1 FROM candidate_promoters cp "
-            "WHERE cp.run_id=c.run_id AND cp.candidate_id=c.candidate_id AND cp.promoter_id=p.promoter_id)) OR "
-            "(p.target_kind='tu' AND EXISTS (SELECT 1 FROM candidate_tus ct "
-            "WHERE ct.run_id=c.run_id AND ct.candidate_id=c.candidate_id AND ct.tu_id=p.tu_id))) "
+            "SELECT DISTINCT p.* FROM reference_regulatory_paths p WHERE p.run_id=? "
+            "AND p.interaction_id IN (SELECT ri.interaction_id FROM regulatory_interactions ri WHERE ri.run_id=? AND "
+            "(ri.gene_id=? OR ri.promoter_id IN (SELECT cp.promoter_id FROM candidate_promoters cp WHERE cp.run_id=? "
+            "AND cp.candidate_id=? UNION SELECT tp.promoter_id FROM tu_promoters tp JOIN tu_genes tg "
+            "ON tg.tu_id=tp.tu_id WHERE tg.gene_id=?) OR ri.tu_id IN (SELECT ct.tu_id FROM candidate_tus ct "
+            "WHERE ct.run_id=? AND ct.candidate_id=? UNION SELECT tu_id FROM tu_genes WHERE gene_id=?))) "
             "ORDER BY p.actor_name, p.interaction_id, p.promoter_id, p.tu_id, p.gene_id",
-            (candidate_id, self._run_id(run_id)),
+            (run_id, run_id, candidate["gene_id"], run_id, candidate["candidate_id"], candidate["gene_id"],
+             run_id, candidate["candidate_id"], candidate["gene_id"]),
         )
 
     def get_promoter(self, promoter_id: str, run_id: str | None = None) -> dict | None:
