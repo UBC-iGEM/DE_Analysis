@@ -163,3 +163,40 @@ def database_root(tmp_path):
                                     "regulondb_release": "14.5.0"}
     (root / "config/regulondb.lock.json").write_text(json.dumps(lock))
     return root
+
+
+@pytest.fixture
+def extended_database_root(database_root):
+    """Reference interactions at all three target levels, including missing context."""
+    reference = database_root / "data/references/regulondb"
+    path = reference / "TUSet.tsv"
+    with path.open(newline="") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    rows.append({"1)id": "T3", "2)name": "operonD", "3)tuGenes": "GeneD", "4)promoterId": "",
+                 "5)confidenceLevel": "S"})
+    _write_tsv(path, rows)
+    path = reference / "RISet.tsv"
+    with path.open(newline="") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    keys = {key.split(")", 1)[1]: key for key in rows[0]}
+    for identifier, kind, actor, name, target in (
+        ("I3", "sRNA-gene", "R2", "RyhB", "G1:GeneA"),
+        ("I4", "Sigma-TU", "R3", "sigma70", "T1:operonA"),
+        ("I5", "sRNA-gene", "R2", "RyhB", "G2:GeneB"),
+        ("I6", "sRNA-gene", "R2", "RyhB", "G3:UnmappedGene"),
+        ("I7", "TF-TU", "R4", "ArcA", "T3:operonD"),
+    ):
+        row = {key: "" for key in rows[0]}
+        row.update({keys[key]: value for key, value in {
+            "id": identifier, "type": kind, "regulatorId": actor, "regulatorName": name,
+            "targetTuOrGene": target, "riFunction": "repressor", "confidenceLevel": "S",
+            "riEvidence": "expression", "riPMIDS": "3",
+        }.items()})
+        rows.append(row)
+    _write_tsv(path, rows)
+    lock_path = database_root / "config/regulondb.lock.json"
+    lock = json.loads(lock_path.read_text())
+    for filename, asset in lock["assets"].items():
+        asset["sha256"] = hashlib.sha256((reference / filename).read_bytes()).hexdigest()
+    lock_path.write_text(json.dumps(lock))
+    return database_root

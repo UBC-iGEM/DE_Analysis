@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -426,7 +426,10 @@ FROM candidates c
 JOIN genes g ON g.gene_id = c.gene_id
 LEFT JOIN promoters p ON p.promoter_id = c.promoter_id
 LEFT JOIN candidate_reviews cr ON cr.run_id = c.run_id AND cr.candidate_id = c.candidate_id
-  AND cr.edit_id = (SELECT edit_id FROM candidate_reviews cr2 WHERE cr2.run_id = c.run_id AND cr2.candidate_id = c.candidate_id ORDER BY cr2.edit_id DESC LIMIT 1);
+  AND cr.edit_id = (SELECT cr2.edit_id FROM candidate_reviews cr2
+      JOIN curation_edits ce ON ce.edit_id = cr2.edit_id
+      WHERE cr2.run_id = c.run_id AND cr2.candidate_id = c.candidate_id
+      ORDER BY ce.edited_at DESC, ce.edit_id DESC LIMIT 1);
 
 CREATE VIEW IF NOT EXISTS drug_response_matrix AS
 SELECT d.run_id, d.gene_id, g.canonical_name, x.name AS contrast_name,
@@ -461,18 +464,43 @@ LEFT JOIN candidate_promoters cp ON cp.run_id = c.run_id AND cp.candidate_id = c
         SELECT 1 FROM tu_promoters tp WHERE tp.tu_id = ct.tu_id AND tp.promoter_id = cp.promoter_id
     ));
 
-CREATE VIEW IF NOT EXISTS reference_promoter_paths AS
+CREATE VIEW IF NOT EXISTS reference_regulatory_paths AS
+WITH links AS (
+    SELECT ri.interaction_id, ri.promoter_id, tp.tu_id, tg.gene_id,
+           'promoter_tu_membership' AS path_basis, 'direct' AS promoter_link
+    FROM regulatory_interactions ri
+    LEFT JOIN tu_promoters tp ON tp.promoter_id = ri.promoter_id
+    LEFT JOIN tu_genes tg ON tg.tu_id = tp.tu_id
+    WHERE ri.target_kind = 'promoter'
+    UNION ALL
+    SELECT ri.interaction_id, tp.promoter_id, ri.tu_id, tg.gene_id,
+           'tu_membership', CASE WHEN tp.promoter_id IS NULL THEN 'missing' ELSE 'context' END
+    FROM regulatory_interactions ri
+    LEFT JOIN tu_promoters tp ON tp.tu_id = ri.tu_id
+    LEFT JOIN tu_genes tg ON tg.tu_id = ri.tu_id
+    WHERE ri.target_kind = 'tu'
+    UNION ALL
+    SELECT ri.interaction_id, tp.promoter_id, tg.tu_id, ri.gene_id,
+           'gene_tu_context', CASE WHEN tp.promoter_id IS NULL THEN 'missing' ELSE 'context' END
+    FROM regulatory_interactions ri
+    LEFT JOIN tu_genes tg ON tg.gene_id = ri.gene_id
+    LEFT JOIN tu_promoters tp ON tp.tu_id = tg.tu_id
+    WHERE ri.target_kind = 'gene'
+)
 SELECT ri.run_id, ri.interaction_id, ri.actor_id,
        a.name AS actor_name, a.actor_type, ri.interaction_type, ri.effect,
        ri.conformation, ri.confidence, ri.site_evidence,
-       ri.interaction_evidence, ri.pmids, ri.source_release, ri.site_id,
-       p.promoter_id, p.name AS promoter_name, tp.tu_id, tg.gene_id
+       ri.interaction_evidence, ri.evidence_category, ri.pmids, ri.source_release, ri.site_id,
+       ri.target_kind, COALESCE(ri.promoter_id, ri.tu_id, ri.gene_id) AS target_id,
+       l.promoter_id, p.name AS promoter_name, l.tu_id, l.gene_id,
+       l.path_basis, l.promoter_link
 FROM regulatory_interactions ri
 JOIN regulatory_actors a ON a.actor_id = ri.actor_id
-JOIN promoters p ON p.promoter_id = ri.promoter_id
-LEFT JOIN tu_promoters tp ON tp.promoter_id = p.promoter_id
-LEFT JOIN tu_genes tg ON tg.tu_id = tp.tu_id
-WHERE ri.target_kind = 'promoter';
+JOIN links l ON l.interaction_id = ri.interaction_id
+LEFT JOIN promoters p ON p.promoter_id = l.promoter_id;
+
+CREATE VIEW IF NOT EXISTS reference_promoter_paths AS
+SELECT * FROM reference_regulatory_paths;
 
 CREATE VIEW IF NOT EXISTS sample_qc_summary AS
 SELECT q.run_id, q.sample_id, s.condition, s.source_file,

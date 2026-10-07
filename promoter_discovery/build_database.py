@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .database import DEFAULT_DATABASE, close_database, open_database, transaction
+from .curation import archive_path, preserve_existing_reviews, restore_reviews
 
 
 TARGETS = {
@@ -495,9 +496,12 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
             _insert_candidate_evidence(connection, root, run_id, contrast_ids)
             _insert_network(connection, root, run_id, release)
             _insert_assessment(connection, root, run_id)
+            preserve_existing_reviews(database_path)
+            restore_reviews(connection, archive_path(database_path), run_id)
             if connection.execute("PRAGMA foreign_key_check").fetchone():
                 raise ValueError("Database contains broken foreign-key relationships")
-            connection.execute("UPDATE analysis_runs SET status='complete', summary_json=? WHERE run_id=?", (json.dumps({"input_files": len(inputs)}), run_id))
+            coverage = _reference_coverage(connection, root)
+            connection.execute("UPDATE analysis_runs SET status='complete', summary_json=? WHERE run_id=?", (json.dumps({"input_files": len(inputs), "reference_coverage": coverage}), run_id))
         connection.execute("PRAGMA journal_mode = DELETE")
         close_database(connection)
         connection = None
@@ -510,6 +514,30 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
         Path(f"{temp_path}-shm").unlink(missing_ok=True)
         raise
     return database_path
+
+
+def _reference_coverage(connection, root: Path) -> dict:
+    """Check complete source import and report unresolved contextual links."""
+    counts = {}
+    for filename, table in (("RISet.tsv", "regulatory_interactions"),
+                            ("PromoterSet.tsv", "promoters"), ("TUSet.tsv", "transcription_units")):
+        source_ids = {row["id"] for row in _read_reference(root / "data/references/regulondb" / filename)}
+        key = {"regulatory_interactions": "interaction_id", "promoters": "promoter_id",
+               "transcription_units": "tu_id"}[table]
+        imported_ids = {row[0] for row in connection.execute(f"SELECT {key} FROM {table}")}
+        if not source_ids <= imported_ids:
+            raise ValueError(f"Incomplete reference import: {filename}")
+        counts[table] = len(source_ids)
+    paths = connection.execute("SELECT COUNT(DISTINCT interaction_id) FROM reference_regulatory_paths").fetchone()[0]
+    if paths != counts["regulatory_interactions"]:
+        raise ValueError("Regulatory paths do not cover every reference interaction")
+    counts["interactions_by_target"] = dict(connection.execute(
+        "SELECT target_kind, COUNT(*) FROM regulatory_interactions GROUP BY target_kind"))
+    counts["interactions_without_promoter"] = connection.execute(
+        "SELECT COUNT(*) FROM regulatory_interactions ri WHERE NOT EXISTS "
+        "(SELECT 1 FROM reference_regulatory_paths p WHERE p.interaction_id=ri.interaction_id AND p.promoter_id IS NOT NULL)"
+    ).fetchone()[0]
+    return counts
 
 
 def main(argv=None) -> None:
