@@ -1,14 +1,33 @@
-network_analysis/output/
-outputs/
-data/network_regulator_gene.tsv
-data/network_sigma_gene.tsv
-data/network_gene_mapping.tsv
-data/regulondb/
-data/precise1k/
-**/__pycache__/
+# Generated analysis results
+results/differential_expression/
+results/regulatory_network/
+results/promoter_candidates/
+results/promoter_review/
+results/candidate_assessment/
+results/custom_analysis/
+results/precise1k_context/
+results/promoter_discovery.sqlite*
+# Persistent user annotations: keep these locally when deleting generated results
+results/*.curation.sqlite*
+wiki_assets/
+
+# Downloaded reference assets (source metadata and locks stay tracked)
+data/references/
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.DS_Store
-.venv/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local editor and operating-system files
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db

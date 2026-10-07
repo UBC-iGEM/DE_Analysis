@@ -1,0 +1,138 @@
+{
+  "thresholds": {
+    "log2_fold_change": 2.0,
+    "padj": 0.05
+  },
+  "benchmark": {
+    "study": "GSE220559",
+    "strain": "E. coli K-12 MG1655",
+    "wetlab_antibiotics": [
+      "amoxicillin",
+      "cephalexin",
+      "gentamicin",
+      "tobramycin"
+    ],
+    "min_count": 10,
+    "min_samples": 3,
+    "design": "~condition",
+    "normalization": "joint median-of-ratios across unique samples",
+    "interpretation": "Within-study discovery and challenges, not independent or exact-drug validation."
+  },
+  "datasets": [
+    {
+      "name": "benchmark_ceftazidime",
+      "antibiotic_class": "beta_lactam",
+      "treatment": "ceftazidime",
+      "comparison": "ceftazidime_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/raw/GSE220559/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>CAZ|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": [
+        "Wu"
+      ],
+      "treated_groups": [
+        "CAZ"
+      ],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount",
+      "source_study": "GSE220559",
+      "role": "discovery",
+      "de_method": "pydeseq2",
+      "caveat": "Class-level benchmark proxy; does not validate the four wet-lab antibiotics.",
+      "output_directory": "ceftazidime"
+    },
+    {
+      "name": "benchmark_imipenem",
+      "antibiotic_class": "beta_lactam",
+      "treatment": "imipenem",
+      "comparison": "imipenem_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/raw/GSE220559/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>IPM|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": [
+        "Wu"
+      ],
+      "treated_groups": [
+        "IPM"
+      ],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount",
+      "source_study": "GSE220559",
+      "role": "within_study_robustness",
+      "de_method": "pydeseq2",
+      "caveat": "Class-level benchmark proxy; does not validate the four wet-lab antibiotics.",
+      "output_directory": "imipenem"
+    },
+    {
+      "name": "benchmark_kanamycin",
+      "antibiotic_class": "aminoglycoside",
+      "treatment": "kanamycin",
+      "comparison": "kanamycin_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/raw/GSE220559/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>KAN|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": [
+        "Wu"
+      ],
+      "treated_groups": [
+        "KAN"
+      ],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount",
+      "source_study": "GSE220559",
+      "role": "discovery",
+      "de_method": "pydeseq2",
+      "caveat": "Class-level benchmark proxy; does not validate the four wet-lab antibiotics.",
+      "output_directory": "kanamycin"
+    },
+    {
+      "name": "benchmark_ciprofloxacin",
+      "antibiotic_class": "fluoroquinolone",
+      "treatment": "ciprofloxacin",
+      "comparison": "ciprofloxacin_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/raw/GSE220559/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>CIP|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": [
+        "Wu"
+      ],
+      "treated_groups": [
+        "CIP"
+      ],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount",
+      "source_study": "GSE220559",
+      "role": "cross_reactivity_challenge",
+      "de_method": "pydeseq2",
+      "caveat": "Class-level benchmark proxy; does not validate the four wet-lab antibiotics.",
+      "output_directory": "ciprofloxacin"
+    },
+    {
+      "name": "benchmark_polymyxin_e",
+      "antibiotic_class": "polymyxin",
+      "treatment": "polymyxin_e",
+      "comparison": "polymyxin_e_vs_water_control",
+      "input_type": "tar_gene_tables",
+      "archive": "data/raw/GSE220559/GSE220559_RAW.tar",
+      "processed_member_pattern": ".txt.gz",
+      "sample_name_regex": "(?P<sample_group>PME|Wu)_(?P<replicate>[0-9]+)",
+      "control_groups": [
+        "Wu"
+      ],
+      "treated_groups": [
+        "PME"
+      ],
+      "gene_id_column": "Gene_id",
+      "value_suffix": "readcount",
+      "source_study": "GSE220559",
+      "role": "cross_reactivity_challenge",
+      "de_method": "pydeseq2",
+      "caveat": "Class-level benchmark proxy; does not validate the four wet-lab antibiotics.",
+      "output_directory": "polymyxin_e"
+    }
+  ]
+}

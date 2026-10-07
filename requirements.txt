@@ -1,6 +1,12 @@
-pandas
-numpy
-scipy
+numpy>=1.24
+pandas>=2.0
+scipy>=1.12
 matplotlib
 plotly
 openpyxl
+networkx>=3.2,<4
+pyvis>=0.3.2,<1
+pymodulon==0.2.1
+pydeseq2==0.5.4
+certifi>=2024.2.2
+pytest>=8

@@ -1,7 +1,0 @@
-sample_id,dataset,antibiotic_class,treatment,sample_group,condition,replicate,source_file
-WT_1,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,WT,control,1,GSM1147038_WT1_processed.txt.gz
-WT_2,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,WT,control,2,GSM1147039_WT2_processed.txt.gz
-WT_3,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,WT,control,3,GSM1147040_WT3_processed.txt.gz
-512_1,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,512,treated,1,GSM1147044_512_1_processed.txt.gz
-512_2,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,512,treated,2,GSM1147045_512_2_processed.txt.gz
-512_3,amoxicillin_resistant_vs_wt,beta_lactam,amoxicillin,512,treated,3,GSM1147046_512_3_processed.txt.gz

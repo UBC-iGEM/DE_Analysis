@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-18T22:33:01+00:00",
+  "assets": {
+    "regulondb_regulator_gene": {
+      "path": "data/references/regulondb/network_regulator_gene.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "b6ff71af23dca45143a751c7b300e5163da38dc3581cae20c58ccb40a9217eb9",
+      "size": 393381,
+      "retrieved_at": "2026-09-18T01:57:16+00:00",
+      "remote_name": "NetworkRegulatorGene",
+      "remote_id": "RDBECOLIDLF00005",
+      "columns_details": "# Columns:\n# (1) regulatorId. Regulator identifier\n# (2) regulatorName. Regulator Name\n# (3) regulatorGeneName. Gene(s) coding for the TF\n# (4) regulatedGeneId. Gene ID regulated by the Regulator (regulated Gene)\n# (5) regulatedGeneName. Gene regulated by the Regulator (regulated Gene)\n# (6) function. Regulatory Function of the Regulator on the regulated Gene (+ activator, - repressor, -+ dual, ? unknown)\n# (7) confidenceLevel. RI confidence level based on its evidence (Values: Confirmed[C], Strong[S], Weak[W], Unknown[?])",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_sigma_gene": {
+      "path": "data/references/regulondb/network_sigma_gene.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "cc5f9a5cdc4ef6ee7b64091f9ed44140eebfb45e24a99c51e1edac7c54bc4929",
+      "size": 247288,
+      "retrieved_at": "2026-09-18T01:57:17+00:00",
+      "remote_name": "NetworkSigmaGene",
+      "remote_id": "RDBECOLIDLF00018",
+      "columns_details": "# Columns:\n(1) sigmaName. Sigma Name\n# (2) regulatedGeneName. Gene regulated by the Sigma Factor (regulated Gene)\n# (3) function. Regulatory Function of the Sigma on the regulated Gene (+ activator, - repressor, -+ dual, ? unknown)\n# (4)promoterEvidences. Evidence that supports the regulation the sigma on the promoter and the promoter evidences\n# (5) confidenceLevel. RI confidence level based on its evidence (Values: Confirmed[C], Strong[S], Weak[W], Unknown[?])",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_k12_gene_mapping": {
+      "path": "data/references/regulondb/GeneProductAllIdentifiersSet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "772d6d92e8f1e0231e9ce6e53f135f80b4b51524b4bba6762ed70829caf960fb",
+      "size": 2261184,
+      "retrieved_at": "2026-09-18T01:57:19+00:00",
+      "remote_name": "GeneProductAllIdentifiersSet",
+      "remote_id": "RDBECOLIDLF00017",
+      "columns_details": "# Columns:\n# (1) Gene identifier assigned by RegulonDB\n# (2) Gene name\n# (3) Gene left end position in the genome\n# (4) Gene right end position in the genome\n# (5) DNA strand where the gene is coded\n# (6) other gene synonyms\n# (7) Other database's id  related to gene\n# (8) Product identifier of the gene\n# (9) Product name of the gene\n# (10) Other products synonyms\n# (11) Other database's id  related to product",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_tuset": {
+      "path": "data/references/regulondb/TUSet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "c96c8a3b56af4b769e7fa375dddb9cd7a4ceaccfe569ecedb23c1f5fe8f339fc",
+      "size": 446341,
+      "retrieved_at": "2026-09-18T01:57:21+00:00",
+      "remote_name": "TUSet",
+      "remote_id": "RDBECOLIDLF00010",
+      "columns_details": "# Columns:\n# (1) id. Transcription Unit identifier assigned by RegulonDB\n# (2) name. Transcription unit name \n# (3) operonId. Operon Id containing the transcription unit\n# (4) operonName. Operon name containing the transcription unit\n# (5) tuGenes. Name of the gene(s) contained in the transcription unit\n# (6) promoterId. Promoter Id\n# (7) promoterName. Promoter Name\n# (8) terminatorIds. Ids of the terminators associated to transcription unit\n# (9) tuEvidence. Evidence that supports the existence of the transcription unit\n# (10) addEvidence. Additive Evidence [CV(EvidenceCode1/EvidenceCodeN)|Confidence Level]\n# (11) confidenceLevel. TU confidence level (Values: Confirmed, Strong, Weak)\n# (12) PMIDs. PMIDs associated to object",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_promoterset": {
+      "path": "data/references/regulondb/PromoterSet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "0ba45e282c1a264dc75483645adacad98bbcb8421aeb680c959ac1833ff6a0f4",
+      "size": 940777,
+      "retrieved_at": "2026-09-18T01:57:26+00:00",
+      "remote_name": "PromoterSet",
+      "remote_id": "RDBECOLIDLF00011",
+      "columns_details": "# Columns:\n# (1) id. Promoter identifier assigned by RegulonDB\n# (2) name. Promoter Name\n# (3) strand. DNA strand where the promoter is located\n# (4) posTSS. Genome map position of Transcription Start Site (+1)\n# (5) sigmaFactor. Sigma Factor that recognize the promoter\n# (6) sequence. Promoter Sequence (+1 upper case)\n# (7) firstGeneName. Name of the first gene of promoter\n# (8) distToFirstGene. distance to first gene of promoter\n# (9) boxMinus10pos. Positions of the box -10\n# (10) boxMinus10pos. Sequence of the box -10\n# (11) boxMinus35pos. Positions of the box -35\n# (12) boxMinus35pos. Sequence of the box -35\n# (13) promoterEvidence. Evidence that supports the existence of the promoter\n# (14) addEvidence. Additive Evidence [CV(EvidenceCode1/EvidenceCodeN)|Confidence Level]\n# (15) confidenceLevel. Promoter confidence level (Values: Confirmed, Strong, Weak)\n# (16) pmids associated to object",
+      "regulondb_release": "14.5.0"
+    },
+    "regulondb_riset": {
+      "path": "data/references/regulondb/RISet.tsv",
+      "provider": "regulondb_graphql",
+      "source_url": "https://regulondb.ccg.unam.mx/graphql",
+      "source_revision": null,
+      "dataset_release": null,
+      "sha256": "18030ff126f80d7b18083bfa531401efa968f20ac9e20897e67a69617122cc0d",
+      "size": 3604562,
+      "retrieved_at": "2026-09-18T22:32:57+00:00",
+      "remote_name": "RISet",
+      "remote_id": "RDBECOLIDLF00001",
+      "columns_details": "# Columns:\n# (1) id. Regulatory interaction (RI) identifier assigned by RegulonDB\n# (2) type. Regulatory interaction type [tf-promoter, tf-tu, tf-gene,srna-promoter, srna-tu, srna-gene, compound-promoter, compound-tu, compound-gene]\n# (3) regulatorId. Transcription Factor (TF) identifier assigned by RegulonDB\n# (4) regulatorName. Regulator name\n# (5) cnfName. regulator active conformation name\n# (6) tfrsId. regulator regulatory site (TFRS) identifier assigned by RegulonDB\n# (7) tfrsLeft. TFRS left end position in the genome\n# (8) tfrsRight. TFRS right end position in the genome\n# (9) strand. DNA strand where the TFRS is located\n# (10) tfrsSeq. TFRS sequence (upper case)\n# (11) riFunction. Gene expression effect caused by the TF bound to the TFRS\n# (12) promoterId. Promoter Identifier assigned by RegulonDB\n# (13) promoterName. Promoter name\n# (14) tss. Transcription start site (+1) position in the genome\n# (15) sigmaF. Sigma Factor that recognize the promoter\n# (16) DistToPm. Relative distance from the center position of TFRS to the Transcription Start Site\n# (17) firstGene. first transcribed gene name\n# (18) tfrsDistTo1Gene. Relative distance from center position of TFRS to the start of first gene\n# (19) targetTuOrGene. Transcription unit or gene (id:name) regulated by the TF\n# (20) confidenceLevel. RI confidence level (Values: Confirmed, Strong, Weak)\n# (21) tfrsEvidence. Evidence that supports the existence of the TFRS [EvidenceCode|EvidenceType(C:confirmed S:strong W:weak)]]\n# (22) riEvidence. Evidence that supports the RI function [EvidenceCode|EvidenceType(C:confirmed S:strong W:weak)]\n# (23) addEvidence. Additive Evidence [CV(EvidenceCode1/EvidenceCodeN)|Confidence Level]\n# (24) riEvTech. Evidence related to the type of technology used to determine the RI\n# (25) riEvCategory. Evidence  were categorized in classical, ht or non-experimental\n# (26) tfrsPMIDS. PMIDS of the TFRS\n# (27) riPMIDS. PMIDS of the regulatory interaction",
+      "regulondb_release": "14.5.0"
+    },
+    "mg1655_genome": {
+      "path": "data/references/ecoli_mg1655/U00096.3.fasta",
+      "provider": "http",
+      "source_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U00096.3&rettype=fasta&retmode=text",
+      "source_revision": "U00096.3",
+      "dataset_release": null,
+      "sha256": "28a7167d8bab60570cd6e3ddacdde75d5c51db60e1009fb8c241f1da446b6152",
+      "size": 4708032,
+      "retrieved_at": "2026-09-18T22:33:00+00:00"
+    },
+    "regulondb_k12_gene_mapping:derived": {
+      "source_asset": "regulondb_k12_gene_mapping",
+      "path": "data/references/regulondb/network_gene_mapping.tsv",
+      "sha256": "8c3018d8a20e3c8210d2f43a549482c6efedb4cdfe7602630a4f5d6a8ed9c4e2",
+      "size": 392228,
+      "rows": 4759,
+      "source_release": "14.5.0",
+      "retrieved_at": "2026-09-18T22:33:01+00:00"
+    }
+  }
+}
