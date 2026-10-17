@@ -7,6 +7,7 @@ results/candidate_assessment/
 results/custom_analysis/
 results/precise1k_context/
 results/promoter_discovery.sqlite*
+results/demo.sqlite*
 # Persistent user annotations: keep these locally when deleting generated results
 results/*.curation.sqlite*
 wiki_assets/
@@ -25,6 +26,9 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+*.egg-info/
+build/
+dist/
 
 # Local editor and operating-system files
 .vscode/
