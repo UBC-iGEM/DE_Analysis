@@ -1,0 +1,14 @@
+{
+  "Geist.ttf": {
+    "source": "https://github.com/google/fonts/tree/main/ofl/geist",
+    "sha256": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659",
+    "license_file": "Geist-OFL.txt",
+    "original_filename": "Geist[wght].ttf"
+  },
+  "SourceSerif4.ttf": {
+    "source": "https://github.com/google/fonts/tree/main/ofl/sourceserif4",
+    "sha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b",
+    "license_file": "SourceSerif4-OFL.txt",
+    "original_filename": "SourceSerif4[opsz,wght].ttf"
+  }
+}

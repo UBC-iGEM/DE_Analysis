@@ -49,12 +49,20 @@ def create_server(database_path: str | Path, port: int = 8000) -> HTTPServer:
     database = Database(database_path, read_only=True)
     database.close()
     page = Path(__file__).with_name("explorer.html")
+    fonts = {
+        "/static/fonts/Geist.ttf": "Geist.ttf",
+        "/static/fonts/SourceSerif4.ttf": "SourceSerif4.ttf",
+    }
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlsplit(self.path)
             if url.path == "/":
                 self.respond(200, page.read_bytes(), "text/html; charset=utf-8")
+                return
+            if url.path in fonts:
+                body = (page.parent / "static/fonts" / fonts[url.path]).read_bytes()
+                self.respond(200, body, "font/ttf")
                 return
             if not url.path.startswith("/api/"):
                 self.respond(404, b"Not found", "text/plain; charset=utf-8")

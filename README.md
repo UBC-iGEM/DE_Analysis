@@ -37,6 +37,10 @@ reference records. Expand the assessment section for stability, cross-reactivity
 and normalized-count replicate summaries. The HTTP interface is read-only,
 binds to localhost, and is intended for local use.
 
+The explorer follows FAST's brand palette and uses bundled Geist Bold headings
+and Source Serif 4 body text, so typography works offline. The typefaces retain
+their SIL Open Font Licenses in `promoter_discovery/static/fonts/`.
+
 ## Reproduce the scientific example
 
 ```bash
@@ -235,7 +239,7 @@ not implemented yet.
 ## License and citation
 
 Project-authored code and documentation use the [MIT license](LICENSE).
-**Third-party data are excluded from that grant.** RegulonDB data, the GEO source
+**Third-party data and typefaces are excluded from that grant.** RegulonDB data, the GEO source
 archive, PRECISE-1K, and the GenBank genome retain their providers' terms; see
 `config/*assets.json` and the [data inventory](data/README.md). Review those terms
 before distributing a populated database. The fictional demo avoids redistribution
