@@ -1,8 +1,9 @@
 """SQLite connection and schema helpers for integrated project results.
 
 The database is a generated query layer over the pipeline's reproducible files.
-Scientific result tables are intentionally added in later schema migrations;
-this module establishes the shared metadata and reference-data foundation.
+The schema links scientific evidence and reference relationships to analysis
+runs. Schema upgrades rebuild the generated snapshot and preserve reviews in
+the independent curation archive.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
 
 
@@ -319,8 +320,22 @@ CREATE TABLE IF NOT EXISTS replicate_metrics (
     mean_value REAL,
     standard_deviation REAL,
     coefficient_of_variation REAL,
-    metrics_json TEXT
+    metrics_json TEXT,
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
 );
+
+CREATE TABLE IF NOT EXISTS candidate_assessments (
+    run_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    assessment_type TEXT NOT NULL CHECK (assessment_type IN ('stability', 'cross_reactivity')),
+    source_row INTEGER NOT NULL,
+    metrics_json TEXT NOT NULL,
+    PRIMARY KEY (run_id, assessment_type, source_row),
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_replicate_candidate ON replicate_metrics(run_id, candidate_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_candidate ON candidate_assessments(run_id, candidate_id);
 
 CREATE TABLE IF NOT EXISTS operon_support (
     support_id TEXT PRIMARY KEY,

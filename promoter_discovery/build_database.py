@@ -13,17 +13,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from .database import DEFAULT_DATABASE, close_database, open_database, transaction
+from .database import DEFAULT_DATABASE, SCHEMA_VERSION, close_database, open_database, transaction
 from .curation import archive_path, preserve_existing_reviews, restore_reviews
+from . import __version__
 
 
-TARGETS = {
-    "ceftazidime": ("cephalexin", "beta_lactam", "proxy"),
-    "imipenem": ("amoxicillin", "beta_lactam", "proxy"),
-    "kanamycin": ("gentamicin", "aminoglycoside", "proxy"),
-    "ciprofloxacin": ("cross_reactivity", "other", "challenge"),
-    "polymyxin_e": ("cross_reactivity", "other", "challenge"),
+OBSERVED_COMPOUNDS = {
+    "ceftazidime": ("beta_lactam", "proxy"),
+    "imipenem": ("beta_lactam", "proxy"),
+    "kanamycin": ("aminoglycoside", "proxy"),
+    "ciprofloxacin": ("other", "challenge"),
+    "polymyxin_e": ("other", "challenge"),
 }
+WETLAB_TARGETS = {"amoxicillin": "beta_lactam", "cephalexin": "beta_lactam",
+                  "gentamicin": "aminoglycoside", "tobramycin": "aminoglycoside"}
 REFERENCE_FILES = (
     "data/references/regulondb/TUSet.tsv",
     "data/references/regulondb/PromoterSet.tsv",
@@ -97,6 +100,9 @@ def _required_files(root: Path, config: dict) -> list[Path]:
         results / "candidate_assessment" / "operon_support.csv",
         results / "candidate_assessment" / "regulatory_sites.csv",
         results / "candidate_assessment" / "sample_qc.csv",
+        results / "candidate_assessment" / "candidate_replicates.csv",
+        results / "candidate_assessment" / "candidate_stability.csv",
+        results / "candidate_assessment" / "cross_reactivity.csv",
         results / "promoter_candidates" / "annotated_candidates.csv",
         results / "promoter_review" / "promoter_review.csv",
         results / "promoter_review" / "candidate_promoter_mapping.csv",
@@ -125,6 +131,8 @@ def _verify_reference_files(root: Path, release: str) -> None:
 def _input_hashes(root: Path, files: Iterable[Path]) -> tuple[str, dict[str, str]]:
     hashes = {path.relative_to(root).as_posix(): _file_sha256(path) for path in files}
     combined = hashlib.sha256()
+    # An importer/schema change must not inherit approvals for an older snapshot.
+    combined.update(f"schema={SCHEMA_VERSION}\npipeline={__version__}\n".encode())
     for path, digest in sorted(hashes.items()):
         combined.update(f"{path}:{digest}\n".encode())
     return combined.hexdigest(), hashes
@@ -132,9 +140,9 @@ def _input_hashes(root: Path, files: Iterable[Path]) -> tuple[str, dict[str, str
 
 def _insert_run(connection, run_id: str, input_hash: str, config_hash: str, release: str) -> None:
     connection.execute(
-        "INSERT INTO analysis_runs(run_id, created_at, status, config_sha256, input_sha256, reference_release) "
-        "VALUES (?, ?, 'building', ?, ?, ?)",
-        (run_id, datetime.now(timezone.utc).isoformat(), config_hash, input_hash, release),
+        "INSERT INTO analysis_runs(run_id, created_at, status, config_sha256, input_sha256, reference_release, pipeline_version) "
+        "VALUES (?, ?, 'building', ?, ?, ?, ?)",
+        (run_id, datetime.now(timezone.utc).isoformat(), config_hash, input_hash, release, __version__),
     )
 
 
@@ -150,11 +158,19 @@ def _insert_assets(connection, root: Path, run_id: str, files: list[Path], hashe
 
 
 def _insert_antibiotics(connection) -> None:
-    for observed, (target, antibiotic_class, proxy_role) in TARGETS.items():
+    # Class proxies are not one-to-one substitutes for the four wet-lab drugs.
+    for target, antibiotic_class in WETLAB_TARGETS.items():
         connection.execute(
-            "INSERT OR IGNORE INTO antibiotics(antibiotic_id, target_name, observed_compound, antibiotic_class, proxy_role) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (observed, target, observed, antibiotic_class, proxy_role),
+            "INSERT INTO antibiotics(antibiotic_id, target_name, antibiotic_class, proxy_role, notes) "
+            "VALUES (?, ?, ?, 'target', 'Planned wet-lab target; not measured by GSE220559')",
+            (f"wetlab:{target}", target, antibiotic_class),
+        )
+    for observed, (antibiotic_class, proxy_role) in OBSERVED_COMPOUNDS.items():
+        connection.execute(
+            "INSERT INTO antibiotics(antibiotic_id, target_name, observed_compound, antibiotic_class, proxy_role, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (observed, observed, observed, antibiotic_class, proxy_role,
+             "Class-level evidence only; no exact-drug equivalence" if proxy_role == "proxy" else "Cross-reactivity challenge"),
         )
 
 
@@ -182,7 +198,7 @@ def _insert_de(connection, root: Path, run_id: str, config: dict) -> dict[str, s
         first = rows[0]
         comparison_id = f"{run_id}:{observed}"
         contrast_ids[dataset["name"]] = comparison_id
-        target, antibiotic_class, proxy_role = TARGETS.get(observed, (observed, "other", "control"))
+        antibiotic_class, proxy_role = OBSERVED_COMPOUNDS[observed]
         connection.execute(
             "INSERT INTO contrasts(contrast_id, run_id, antibiotic_id, name, numerator, denominator, comparison_type, antibiotic_class, proxy_role) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -258,7 +274,7 @@ def _insert_candidate_evidence(connection, root: Path, run_id: str, contrast_ids
 
 def _insert_samples(connection, root: Path, run_id: str) -> None:
     study_id = "GSE220559"
-    connection.execute("INSERT OR IGNORE INTO studies(study_id, accession, organism, strain, source_archive) VALUES (?, ?, ?, ?, ?)", (study_id, study_id, "Escherichia coli", "K-12", "GSE220559_RAW.tar"))
+    connection.execute("INSERT OR IGNORE INTO studies(study_id, accession, organism, strain, source_archive) VALUES (?, ?, ?, ?, ?)", (study_id, study_id, "Escherichia coli", "K-12 MG1655", "GSE220559_RAW.tar"))
     for row in _read_csv(root / "results/candidate_assessment/sample_qc.csv"):
         sample_id = row["sample_id"]
         connection.execute("INSERT OR IGNORE INTO samples(sample_id, study_id, source_file, condition) VALUES (?, ?, ?, ?)", (sample_id, study_id, row.get("source_file"), row.get("condition") or "unknown"))
@@ -410,8 +426,29 @@ def _insert_panel(connection, root: Path, run_id: str) -> None:
 
 
 def _insert_assessment(connection, root: Path, run_id: str) -> None:
+    assessment = root / "results/candidate_assessment"
+    contrasts = dict(connection.execute("SELECT numerator, contrast_id FROM contrasts WHERE run_id=? AND comparison_type='drug_control'", (run_id,)))
+    config = json.loads((root / "config/benchmark.json").read_text())
+    for dataset in config["datasets"]:
+        contrasts[dataset["name"]] = contrasts[dataset["treatment"]]
+    for row in _read_csv(assessment / "candidate_replicates.csv"):
+        values = json.loads(row["sample_values_json"])
+        connection.execute(
+            "INSERT INTO replicate_metrics(run_id, candidate_id, contrast_id, condition, replicate_count, mean_value, standard_deviation, coefficient_of_variation, metrics_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_id, row["gene"], contrasts[row["source_dataset"]], row["condition"], len(values),
+             _number(row.get("mean")), _number(row.get("sd")), _number(row.get("cv")), json.dumps(row)),
+        )
+    for kind, filename in (("stability", "candidate_stability.csv"), ("cross_reactivity", "cross_reactivity.csv")):
+        for index, row in enumerate(_read_csv(assessment / filename)):
+            connection.execute(
+                "INSERT INTO candidate_assessments VALUES (?, ?, ?, ?, ?)",
+                (run_id, row["gene"], kind, index, json.dumps(row)),
+            )
     for row in _read_csv(root / "results/candidate_assessment/fragment_review.csv"):
-        connection.execute("INSERT OR IGNORE INTO fragment_reviews(fragment_id, run_id, promoter_id, genome_accession, start, end, strand, sequence, sequence_match, missing_coordinates, regulatory_site_count, overlapping_genes_json, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (row.get("promoter_id"), run_id, row.get("promoter_id"), row.get("genome_accession"), _number(row.get("fragment_start")), _number(row.get("fragment_end")), _strand(row.get("strand")), row.get("fragment_sequence"), int(bool(_boolean(row.get("reference_sequence_matches"), False))), int(_number(row.get("fragment_start")) is None or _number(row.get("fragment_end")) is None), _number(row.get("n_curated_sites")), _json(row.get("overlapping_genes")), row.get("construct_status") or "review"))
+        start, end = _number(row.get("fragment_start")), _number(row.get("fragment_end"))
+        missing_coordinates = start is None or end is None
+        sequence_match = None if missing_coordinates else _boolean(row.get("reference_sequence_matches"))
+        connection.execute("INSERT OR IGNORE INTO fragment_reviews(fragment_id, run_id, promoter_id, genome_accession, start, end, strand, sequence, sequence_match, missing_coordinates, regulatory_site_count, overlapping_genes_json, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (row.get("promoter_id"), run_id, row.get("promoter_id"), row.get("genome_accession"), start, end, _strand(row.get("strand")), row.get("fragment_sequence"), sequence_match, int(missing_coordinates), _number(row.get("n_curated_sites")), _json(row.get("overlapping_genes")), row.get("construct_status") or "review"))
     for row in _read_csv(root / "results/candidate_assessment/operon_support.csv"):
         support_id = f"{row.get('regulator')}:{row.get('source_dataset')}:{row.get('direction')}"
         connection.execute("INSERT OR IGNORE INTO operon_support(support_id, run_id, regulated_set, dominant_group_fraction, enrichment, padj, direction, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (support_id, run_id, row.get("overlap_genes"), _number(row.get("dominant_group_gene_fraction")), _number(row.get("odds_ratio")), _number(row.get("padj")), row.get("direction"), json.dumps(row)))

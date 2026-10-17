@@ -219,7 +219,7 @@ def load_de_results(
     if candidate_direction not in {"upregulated", "either-direction"}:
         raise ValueError("candidate_direction must be 'upregulated' or 'either-direction'")
     config = load_dataset_config(config_path)
-    root = Path(data_dir) if data_dir else Path(config["_path"]).parents[1]
+    root = Path(data_dir) if data_dir else Path(config_path).resolve().parents[1]
     provenance = None
     if config.get("benchmark"):
         try:
@@ -474,7 +474,8 @@ def build_graph(
     graph.graph["source_observations"] = observations.to_dict("records")
     if "benchmark_provenance" in observations.attrs:
         graph.graph["benchmark_provenance"] = observations.attrs["benchmark_provenance"]
-    graph.graph["dataset_config"] = config
+    # Keep the serialized graph portable; loader-only paths belong on disk, not in it.
+    graph.graph["dataset_config"] = {key: value for key, value in config.items() if key != "_path"}
     graph.graph["network_scope"] = "full_reference"
     for row in candidates.to_dict("records"):
         attrs = dict(row)
@@ -582,7 +583,7 @@ def main(argv: list[str] | None = None) -> None:
         if not record or record["sha256"] != sha256_file(path):
             raise ValueError(f"Reference is not verified by the same-release lock: {path}")
         releases.add(record.get("regulondb_release") or record.get("source_release") or record.get("dataset_release"))
-        verified.append({"path": str(path), "sha256": record["sha256"]})
+        verified.append({"path": record["path"], "sha256": record["sha256"]})
     if len(releases) != 1 or None in releases:
         raise ValueError("Network and gene mapping must share one verified RegulonDB release")
     graph.graph["regulondb_release"] = releases.pop()

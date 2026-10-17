@@ -29,6 +29,7 @@ def _write_tsv(path, rows):
 def database_root(tmp_path):
     root = tmp_path / "project"
     config = {
+        "benchmark": {"wetlab_antibiotics": ["amoxicillin", "cephalexin", "gentamicin", "tobramycin"]},
         "datasets": [
             {"name": "benchmark_ceftazidime", "treatment": "ceftazidime", "output_directory": "ceftazidime", "role": "discovery"},
             {"name": "benchmark_kanamycin", "treatment": "kanamycin", "output_directory": "kanamycin", "role": "cross_reactivity_challenge"},
@@ -101,6 +102,19 @@ def database_root(tmp_path):
          "promoter_id": "P1", "regulondb_release": "14.5.0"}
     ])
     assessment = root / "results/candidate_assessment"
+    _write_csv(assessment / "candidate_replicates.csv", [
+        {"gene": "genea", "gene_id": "b0001", "source_dataset": "benchmark_ceftazidime",
+         "condition": "benchmark_ceftazidime", "mean": 20, "sd": 2, "cv": 0.1,
+         "sample_values_json": '{"S1": 18, "S2": 20, "S3": 22}'}
+    ])
+    _write_csv(assessment / "candidate_stability.csv", [
+        {"gene": "genea", "antibiotic_class": "beta_lactam", "screen_fraction": 1,
+         "n_screens_selected": 9, "n_screens": 9}
+    ])
+    _write_csv(assessment / "cross_reactivity.csv", [
+        {"gene": "genea", "antibiotic_class": "beta_lactam", "counterpart_dataset": "benchmark_kanamycin",
+         "direct_status": "inconclusive", "family_padj": 0.2}
+    ])
     _write_csv(assessment / "experimental_panel.csv", [
         {"gene": "genea", "promoter_id": "P1", "antibiotic_class": "beta_lactam",
          "selection_order": 1, "selection_basis": "test", "transcription_group": "T1"}
