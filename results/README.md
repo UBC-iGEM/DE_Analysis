@@ -13,6 +13,7 @@ commands in the [project README](../README.md).
 | `candidate_assessment/` | QC and panel figures, replicate summaries, screening stability, cross-reactivity, operon support, proposed fragments, and `experimental_panel.csv` |
 | `promoter_discovery.sqlite` | Generated SQLite query layer linking DE, network, promoter, candidate, panel, QC, and fragment-review records |
 | `promoter_discovery.curation.sqlite` | Persistent user review history; keep this file when cleaning generated outputs |
+| `demo.sqlite` | Optional fictional example created by `python -m promoter_discovery.demo`; separate from scientific results |
 
 Start with the two class shortlists, then review the promoter table. Class lists
 can overlap. The benchmark uses class proxies for the four wet-lab antibiotics;
@@ -46,3 +47,9 @@ The database includes a source-validated reference coverage report.
 The companion curation file is created when reviews are saved. Back it up
 alongside the scientific artifacts: an identical-run rebuild restores reviews,
 while a changed run retains earlier history without applying old approvals.
+
+Schema 11 adds per-candidate stability and cross-reactivity assessment records,
+and imports normalized-count replicate summaries. All are linked to the same
+run and source files as the candidate evidence. Rebuild older generated databases
+with `python -m promoter_discovery.build_database`; existing reviews are preserved
+in the companion file, but new input hashes require fresh approval.

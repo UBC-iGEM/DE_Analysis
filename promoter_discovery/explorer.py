@@ -46,22 +46,22 @@ def query_database(database: Database, path: str, parameters: dict[str, list[str
 
 def create_server(database_path: str | Path, port: int = 8000) -> HTTPServer:
     database_path = Path(database_path).resolve()
-    database = Database(database_path)
+    database = Database(database_path, read_only=True)
     database.close()
-    page = Path(__file__).with_name("explorer.html").read_bytes()
+    page = Path(__file__).with_name("explorer.html")
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlsplit(self.path)
             if url.path == "/":
-                self.respond(200, page, "text/html; charset=utf-8")
+                self.respond(200, page.read_bytes(), "text/html; charset=utf-8")
                 return
             if not url.path.startswith("/api/"):
                 self.respond(404, b"Not found", "text/plain; charset=utf-8")
                 return
             database = None
             try:
-                database = Database(database_path)
+                database = Database(database_path, read_only=True)
                 payload = query_database(database, url.path, parse_qs(url.query))
                 status = 200
             except LookupError as error:
