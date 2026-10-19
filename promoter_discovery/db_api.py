@@ -1,4 +1,4 @@
-"""Small read-oriented Python API for the generated project database."""
+"""Small read-oriented Python API for the generated PRISM database."""
 
 from __future__ import annotations
 
@@ -86,8 +86,10 @@ class Database:
         clauses.append("c.run_id = ?")
         parameters.append(self._run_id(run_id))
         if query:
-            clauses.append("(instr(lower(c.candidate_id), lower(?)) > 0 OR instr(lower(c.canonical_name), lower(?)) > 0)")
-            parameters.extend((query, query))
+            clauses.append("(instr(lower(c.candidate_id), lower(?)) > 0 OR instr(lower(c.canonical_name), lower(?)) > 0 "
+                           "OR EXISTS(SELECT 1 FROM gene_identifiers i WHERE i.run_id=c.run_id AND i.gene_id=c.gene_id "
+                           "AND instr(lower(i.identifier),lower(?)) > 0))")
+            parameters.extend((query, query, query))
         if padj_max is not None or effect_min is not None:
             evidence_clauses = [
                 "e.run_id = c.run_id",
@@ -107,7 +109,27 @@ class Database:
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         return self._rows("SELECT * FROM candidate_summary c" + where + " ORDER BY c.ranking_score DESC NULLS LAST", parameters)
 
+    def _resolve_candidate_id(self, identifier: str, run_id: str | None) -> str | None:
+        """Resolve exact IDs first; an ambiguous alias must never pick a winner."""
+        exact = self.connection.execute(
+            "SELECT candidate_id FROM candidates WHERE run_id=? AND lower(candidate_id)=lower(?)",
+            (run_id, identifier),
+        ).fetchall()
+        matches = exact or self.connection.execute(
+            "SELECT DISTINCT c.candidate_id FROM candidates c JOIN gene_identifiers i "
+            "ON i.run_id=c.run_id AND i.gene_id=c.gene_id WHERE c.run_id=? AND i.identifier=? COLLATE NOCASE",
+            (run_id, identifier),
+        ).fetchall()
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous identifier {identifier!r}; use a candidate ID: "
+                             + ", ".join(sorted(row[0] for row in matches)))
+        return matches[0][0] if matches else None
+
     def get_candidate(self, candidate_id: str, run_id: str | None = None) -> dict | None:
+        run_id = self._run_id(run_id)
+        candidate_id = self._resolve_candidate_id(candidate_id, run_id)
+        if candidate_id is None:
+            return None
         rows = self._rows("SELECT * FROM candidate_summary WHERE lower(candidate_id) = lower(?) AND run_id = ?", (candidate_id, self._run_id(run_id)))
         if not rows:
             return None
@@ -135,6 +157,18 @@ class Database:
             for row in self._rows("SELECT * FROM candidate_assessments WHERE run_id=? AND candidate_id=? ORDER BY assessment_type, source_row",
                                   (result["run_id"], candidate_id))
         ]
+        result["identifiers"] = self._rows(
+            "SELECT namespace,identifier,source_asset_id,source_row,source_release,mapping_basis "
+            "FROM gene_identifiers WHERE run_id=? AND gene_id=? ORDER BY namespace,identifier,source_row",
+            (result["run_id"], result["gene_id"]),
+        )
+        result["experimental_context"] = self._rows(
+            "SELECT DISTINCT q.condition,q.antibiotic_id,q.medium,q.growth_phase,q.concentration,"
+            "q.concentration_unit,q.concentration_basis,q.exposure_minutes,q.source_reference,q.curation_note "
+            "FROM sample_qc_summary q WHERE q.run_id=? AND EXISTS "
+            "(SELECT 1 FROM replicate_metrics r WHERE r.run_id=q.run_id AND r.candidate_id=? "
+            "AND r.condition=q.condition) ORDER BY q.condition", (result["run_id"], candidate_id),
+        )
         return result
 
     def search_regulator(self, regulator: str, run_id: str | None = None) -> list[dict]:
@@ -174,6 +208,7 @@ class Database:
     def candidate_paths(self, candidate_id: str, run_id: str | None = None) -> list[dict]:
         """Gene-target effects apply to that gene, never to siblings in its TU."""
         run_id = self._run_id(run_id)
+        candidate_id = self._resolve_candidate_id(candidate_id, run_id)
         candidate = self.connection.execute(
             "SELECT candidate_id, gene_id FROM candidates WHERE lower(candidate_id)=lower(?) AND run_id=?",
             (candidate_id, run_id),

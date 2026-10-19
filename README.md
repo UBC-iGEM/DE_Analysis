@@ -93,11 +93,12 @@ executable Python serialization, not an interchange format for untrusted uploads
 | Genes retained in the joint fit | 4,176 |
 | Comparisons | 5 drug/control + 10 drug/drug |
 | Candidate genes | 925 |
+| Candidate genes with / without promoter mappings | 469 / 456 |
 | Proposed first screening panel | 12 promoters: six per antibiotic class |
 | Candidate-linked promoter/fragment reviews | 473 |
 | Annotation/genome sequence matches | 448; 25 lack coordinates |
 | Full-reference curated interactions | 6,460 |
-| Full-reference promoters / transcription units | 4,057 / 3,780 |
+| Full-reference promoters / transcription units | 4,057 / 3,767 |
 | Reference interactions without promoter context | 729 |
 
 These are dataset-specific output counts, not accuracy or clinical-performance
@@ -144,11 +145,11 @@ Source counts + locked references
              ↓
 DE + network + promoter + assessment artifacts (CSV/JSON/FASTA/plots)
              ↓ explicit importer; source hashes; atomic replacement
-results/promoter_discovery.sqlite (schema 11)
+results/prism.sqlite (schema 12)
              ↓
 Python API / CLI / local read-only explorer
 
-Versioned reviews → results/promoter_discovery.curation.sqlite
+Versioned reviews → results/prism.curation.sqlite
 ```
 
 The relational layer stores runs, assets, genes, antibiotics, contrasts, DE
@@ -162,17 +163,20 @@ NoSQL or graph database.
 ```bash
 python -m promoter_discovery.db_cli candidates --class beta_lactam --padj-max 0.05
 python -m promoter_discovery.db_cli --json candidate pdhr
+python -m promoter_discovery.db_cli --json candidate b0113
 python -m promoter_discovery.db_cli --json panel
 python -m promoter_discovery.db_cli --json interactions CRP --target-kind promoter
 python -m promoter_discovery.db_cli --json promoter-paths CRP
 python -m promoter_discovery.db_cli --json network pdhr
 python -m promoter_discovery.db_cli --json coverage
+python -m promoter_discovery.db_cli --json qc
+python -m promoter_discovery.db_cli --json runs
 ```
 
 ```python
 from promoter_discovery.db_api import Database
 
-with Database("results/promoter_discovery.sqlite", read_only=True) as db:
+with Database("results/prism.sqlite", read_only=True) as db:
     hits = db.search_candidates(antibiotic_class="beta_lactam", padj_max=0.05)
     candidate = db.get_candidate("pdhr")
     paths = db.reference_promoter_paths("CRP")
@@ -181,7 +185,28 @@ with Database("results/promoter_discovery.sqlite", read_only=True) as db:
 Queries default to the latest completed run; pass `run_id` in Python or
 `--run-id` on run-aware CLI commands to select another run. Generated databases
 are snapshots, not an accumulated multi-release reference archive. Rebuilding
-retains old review history in the companion file, not old scientific snapshots.
+retains old review history in the companion file and superseded scientific
+databases in `results/database_snapshots/<database-stem>/`. Back up both.
+Stop curation writers and active explorer connections before rebuilding.
+
+Schema 12 adds source-linked identifier associations, cited sample-exposure
+context, composite run–contrast constraints, and executing-code fingerprints.
+Search resolves `b0113` to `pdhR` while retaining the source locus. Ambiguous
+identifiers return all search hits; single-record lookup requires an explicit
+candidate ID. Unknown doses and sampling durations remain null.
+
+`config/study_context.json` records the source study's MHB/mid-logarithmic context
+and IC50 dose basis, with citation and curation notes. Numeric doses from Table S1
+have not been curated, and elapsed RNA-sampling exposure times remain unknown.
+Sample metadata retain replicate labels and their provenance.
+
+Run `python -m promoter_discovery.evaluate_selection` for the same-data induction
+baseline comparison. Both methods select six genes per class from the mapped,
+sequence-matching pool. The current panel has 12 distinct promoters/TU groups,
+compared with 10 for the baseline. Median shrunken induction is 3.09 versus 5.65;
+median maximum other-class response magnitude is 1.71 versus 4.59 log2 units.
+These are descriptive selection trade-offs, not independent biological validation.
+The report records input hashes; the baseline choices are exported as CSV.
 
 ### Manual curation
 
@@ -200,8 +225,14 @@ Candidate statuses: `proposed`, `reviewed`, `approved`, `excluded`. Promoter
 statuses: `review`, `validated`, `ready_for_order`, `excluded`; use
 `review-promoter <promoter-id> <status>` with the same audit fields.
 **Keep and back up `*.curation.sqlite` files.** Rebuilds restore reviews only for
-identical input content, schema, and software release; changes require fresh approval. Earlier history
+identical input content, schema, software release, and Python/dependency fingerprint;
+changes require fresh approval. Earlier history
 remains searchable, including reviews preserved during schema upgrades.
+
+The importer records Git revision and checkout status when available. Preserve
+the matching source files for uncommitted builds: a fingerprint cannot recreate
+the code. This records importer provenance without inventing a historical code
+revision for the original expression fit.
 
 ## Repository and contribution
 

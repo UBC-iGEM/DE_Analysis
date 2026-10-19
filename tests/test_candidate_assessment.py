@@ -6,6 +6,7 @@ from promoter_discovery.assess_candidates import (
     candidate_stability, cross_reactivity, fragment_review,
     operon_support, oriented_sequence, select_panel, transcription_groups,
 )
+from promoter_discovery.evaluate_selection import compare_selection
 
 
 def test_direct_comparison_reverses_intervals_and_keeps_null_inconclusive():
@@ -95,3 +96,37 @@ def test_panel_balances_classes_without_reusing_promoters_or_tu_groups():
     assert result.gene.tolist() == ["a", "c"]
     assert result.promoter_id.is_unique and result.transcription_group.is_unique
     assert not result.gene.eq("d").any()
+
+
+def test_effect_baseline_uses_same_pool_reports_redundancy_and_is_order_invariant():
+    options = pd.DataFrame([
+        {"gene": gene, "promoter_id": promoter, "transcription_group": group,
+         "antibiotic_class": cls, "shrunk_effect": effect, "reference_sequence_matches": match,
+         "n_supporting_comparisons": 1, "screen_fraction": 1, "confidence_rank": 2,
+         "regulators": "tf", "direct_stronger_fraction": 0.5, "challenge_max_abs_log2FC": np.nan}
+        for gene, promoter, group, cls, effect, match in [
+            ("a", "p1", "ab", "beta_lactam", 5, True),
+            ("b", "p1", "ab", "aminoglycoside", 4, True),
+            ("c", "p3", "c", "aminoglycoside", 3, True),
+            ("d", "p4", "d", "beta_lactam", 10, False),
+        ]
+    ])
+    panel = select_panel(options, 1)
+    report, baseline = compare_selection(options, panel, 1)
+    assert baseline.gene.tolist() == ["a", "b"]
+    assert report["effect_only"]["unique_promoters"] == 1
+    assert report["prism"]["unique_promoters"] == 2
+    assert report["effect_only"]["class_counts"] == report["prism"]["class_counts"]
+    assert report["effect_only"]["median_max_counterpart_abs_log2_effect"] is None
+    assert report["effect_only"]["missing_counterpart_effects"] == 2
+    shuffled_report, shuffled = compare_selection(options.sample(frac=1, random_state=4), panel, 1)
+    assert report == shuffled_report
+    assert baseline.gene.tolist() == shuffled.gene.tolist()
+    import json
+    json.dumps(report, allow_nan=False)
+    stale = panel.copy()
+    stale.loc[stale.index[0], "shrunk_effect"] += 1
+    with pytest.raises(ValueError, match="disagree"):
+        compare_selection(options, stale, 1)
+    with pytest.raises(ValueError, match="positive integer"):
+        compare_selection(options, panel, 0)

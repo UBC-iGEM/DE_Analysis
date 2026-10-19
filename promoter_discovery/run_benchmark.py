@@ -93,7 +93,7 @@ def run(config_path, root, out):
     dds.deseq2()
     normalized = pd.DataFrame(dds.layers["normed_counts"].T, index=dds.var_names, columns=dds.obs_names)
     out.mkdir(parents=True, exist_ok=True)
-    metadata.to_csv(out / "joint_metadata.csv")
+    metadata.to_csv(out / "joint_metadata.csv", index_label="sample_id")
     pd.DataFrame({"gene_id": counts.index, "passes_common_count_filter": retained}).to_csv(out / "gene_filter.csv", index=False)
     normalized.to_csv(out / "joint_normalized_counts.csv", index_label="gene_id")
     counts.to_csv(out / "joint_raw_counts.csv", index_label="gene_id")

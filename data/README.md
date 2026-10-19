@@ -20,6 +20,12 @@ Shared water controls occur once in the joint count model. The wet-lab targets
 remain amoxicillin, cephalexin, gentamicin, and tobramycin; this study provides
 class proxies rather than exact-drug validation.
 
+[`config/study_context.json`](../config/study_context.json) contains cited
+literature curation for the source study's growth and exposure context. It is
+separate from the model configuration. Numeric doses and elapsed RNA-sampling
+exposure times remain unknown until supported by a reviewed source. Sample
+replicate labels are retained from metadata or the configured filename pattern.
+
 `references/regulondb/` contains the cached regulator/gene and sigma/gene
 networks, gene identifiers, transcription units, promoter annotations, and the
 derived canonical gene mapping. `RISet.tsv` adds curated regulatory-site positions

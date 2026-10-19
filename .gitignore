@@ -7,10 +7,13 @@ results/candidate_assessment/
 results/custom_analysis/
 results/precise1k_context/
 results/promoter_discovery.sqlite*
+results/prism.sqlite*
 results/demo.sqlite*
+results/database_snapshots/
 # Persistent user annotations: keep these locally when deleting generated results
 results/*.curation.sqlite*
 wiki_assets/
+docs/
 
 # Downloaded reference assets (source metadata and locks stay tracked)
 data/references/

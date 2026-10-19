@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import pickle
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import Iterable
 
 from .database import DEFAULT_DATABASE, SCHEMA_VERSION, close_database, open_database, transaction
 from .curation import archive_path, preserve_existing_reviews, restore_reviews
+from .evidence_metadata import insert_identifiers, insert_sample_metadata
+from .provenance import prepare_replacement, preserve_snapshot, source_provenance
 from . import __version__
 
 
@@ -67,6 +70,11 @@ def _strand(value: str | None):
     return {"forward": "+", "reverse": "-", "+": "+", "-": "-"}.get(normalized, "?") if normalized else None
 
 
+def _identifiers(value: str | None) -> list[str]:
+    """Read legacy comma-separated summaries and semicolon reference lists."""
+    return sorted({item.strip() for item in re.split(r"[;,]", value or "") if item.strip()})
+
+
 def _json(value: str | None):
     if value in (None, ""):
         return None
@@ -89,8 +97,10 @@ def _required_files(root: Path, config: dict) -> list[Path]:
     results = root / "results"
     files = [
         root / "config/benchmark.json",
+        root / "config/study_context.json",
         root / "config/regulondb.lock.json",
         results / "differential_expression/model/benchmark_provenance.json",
+        results / "differential_expression/model/joint_metadata.csv",
         results / "differential_expression/model/drug_pairwise_contrasts.csv",
         results / "regulatory_network/regulatory_network.pkl",
         results / "regulatory_network/source_observations.csv",
@@ -128,21 +138,24 @@ def _verify_reference_files(root: Path, release: str) -> None:
             raise ValueError(f"Reference is not verified by the {release} lock: {relative}")
 
 
-def _input_hashes(root: Path, files: Iterable[Path]) -> tuple[str, dict[str, str]]:
+def _input_hashes(root: Path, files: Iterable[Path], code_hash: str) -> tuple[str, dict[str, str]]:
     hashes = {path.relative_to(root).as_posix(): _file_sha256(path) for path in files}
     combined = hashlib.sha256()
     # An importer/schema change must not inherit approvals for an older snapshot.
     combined.update(f"schema={SCHEMA_VERSION}\npipeline={__version__}\n".encode())
+    combined.update(f"code={code_hash}\n".encode())
     for path, digest in sorted(hashes.items()):
         combined.update(f"{path}:{digest}\n".encode())
     return combined.hexdigest(), hashes
 
 
-def _insert_run(connection, run_id: str, input_hash: str, config_hash: str, release: str) -> None:
+def _insert_run(connection, run_id: str, input_hash: str, config_hash: str, release: str, code: dict) -> None:
     connection.execute(
-        "INSERT INTO analysis_runs(run_id, created_at, status, config_sha256, input_sha256, reference_release, pipeline_version) "
-        "VALUES (?, ?, 'building', ?, ?, ?, ?)",
-        (run_id, datetime.now(timezone.utc).isoformat(), config_hash, input_hash, release, __version__),
+        "INSERT INTO analysis_runs(run_id, created_at, status, config_sha256, input_sha256, reference_release, "
+        "pipeline_version,git_revision,code_sha256,code_dirty,code_manifest_json) "
+        "VALUES (?, ?, 'building', ?, ?, ?, ?, ?, ?, ?, ?)",
+        (run_id, datetime.now(timezone.utc).isoformat(), config_hash, input_hash, release, __version__,
+         code["git_revision"], code["code_sha256"], code["code_dirty"], json.dumps(code["code_manifest"], sort_keys=True)),
     )
 
 
@@ -152,7 +165,8 @@ def _insert_assets(connection, root: Path, run_id: str, files: list[Path], hashe
         connection.execute(
             "INSERT INTO assets(asset_id, run_id, path, kind, source_release, sha256, size_bytes) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (relative, run_id, relative, path.suffix.lstrip(".") or "file", release,
+            (relative, run_id, relative, path.suffix.lstrip(".") or "file",
+             release if relative.startswith("data/references/regulondb/") else None,
              hashes[relative], path.stat().st_size),
         )
 
@@ -272,13 +286,14 @@ def _insert_candidate_evidence(connection, root: Path, run_id: str, contrast_ids
         )
 
 
-def _insert_samples(connection, root: Path, run_id: str) -> None:
-    study_id = "GSE220559"
+def _insert_samples(connection, root: Path, run_id: str, config: dict) -> None:
+    study_id = config.get("benchmark", {}).get("study", "GSE220559")
     connection.execute("INSERT OR IGNORE INTO studies(study_id, accession, organism, strain, source_archive) VALUES (?, ?, ?, ?, ?)", (study_id, study_id, "Escherichia coli", "K-12 MG1655", "GSE220559_RAW.tar"))
     for row in _read_csv(root / "results/candidate_assessment/sample_qc.csv"):
         sample_id = row["sample_id"]
         connection.execute("INSERT OR IGNORE INTO samples(sample_id, study_id, source_file, condition) VALUES (?, ?, ?, ?)", (sample_id, study_id, row.get("source_file"), row.get("condition") or "unknown"))
         connection.execute("INSERT INTO sample_qc(run_id, study_id, sample_id, library_size, genes_detected, pc1, pc2) VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, study_id, sample_id, _number(row.get("library_counts")), _number(row.get("genes_detected")), _number(row.get("PC1")), _number(row.get("PC2"))))
+    insert_sample_metadata(connection, root, run_id, config)
 
 
 def _insert_reference_network(connection, root: Path, run_id: str, release: str) -> None:
@@ -361,9 +376,12 @@ def _insert_promoters(connection, root: Path, run_id: str) -> None:
         promoter_id = row.get("promoter_id")
         if not promoter_id:
             continue
-        tu_ids = [item for item in (row.get("tu_ids") or "").split(";") if item]
+        if not connection.execute("SELECT 1 FROM promoters WHERE promoter_id=?", (promoter_id,)).fetchone():
+            raise ValueError(f"Promoter summary contains an unknown reference promoter: {promoter_id}")
+        tu_ids = _identifiers(row.get("tu_ids"))
         for tu_id in tu_ids:
-            connection.execute("INSERT OR IGNORE INTO transcription_units(tu_id, name, source_release) VALUES (?, ?, ?)", (tu_id, row.get("operon_name"), row.get("regulondb_release")))
+            if not connection.execute("SELECT 1 FROM tu_promoters WHERE tu_id=? AND promoter_id=?", (tu_id, promoter_id)).fetchone():
+                raise ValueError(f"Promoter summary contains a non-reference TU/promoter association: {tu_id}, {promoter_id}")
         connection.execute(
             "INSERT INTO promoters(promoter_id, tu_id, name, start, end, strand, tss, sigma_factor, sequence, annotation_status, source_release) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
@@ -379,12 +397,11 @@ def _insert_promoters(connection, root: Path, run_id: str) -> None:
              _strand(row.get("strand")), _number(row.get("tss")), row.get("sigma_factor"),
              row.get("annotated_sequence"), row.get("mapping_status") or "review", row.get("regulondb_release")),
         )
-        for tu_id in tu_ids:
-            connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
-        for name in (row.get("candidate_genes") or "").split(";"):
+        for name in _identifiers(row.get("candidate_genes")):
             gene_id = name.strip().lower()
             if gene_id:
-                connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
+                if not connection.execute("SELECT 1 FROM candidates WHERE run_id=? AND gene_id=?", (run_id, gene_id)).fetchone():
+                    raise ValueError(f"Promoter summary contains an unknown candidate: {gene_id}")
                 connection.execute("INSERT OR IGNORE INTO promoter_genes(promoter_id, gene_id, relationship) VALUES (?, ?, 'candidate')", (promoter_id, gene_id))
 
     for row in _read_csv(root / "results/promoter_review/candidate_promoter_mapping.csv"):
@@ -392,16 +409,13 @@ def _insert_promoters(connection, root: Path, run_id: str) -> None:
         tu_id = row.get("tu_id") or None
         promoter_id = row.get("promoter_id") or None
         if tu_id:
-            connection.execute("INSERT OR IGNORE INTO transcription_units(tu_id, name, source_release) VALUES (?, ?, ?)", (tu_id, row.get("operon_name"), row.get("regulondb_release")))
-            for order, name in enumerate((row.get("tu_genes") or "").split(";")):
-                gene_id = name.strip().lower()
-                if gene_id:
-                    connection.execute("INSERT OR IGNORE INTO genes(gene_id, canonical_name) VALUES (?, ?)", (gene_id, gene_id))
-                    connection.execute("INSERT OR IGNORE INTO tu_genes(tu_id, gene_id, gene_order) VALUES (?, ?, ?)", (tu_id, gene_id, order))
+            if not connection.execute("SELECT 1 FROM tu_genes WHERE tu_id=? AND gene_id=?", (tu_id, candidate_id)).fetchone():
+                raise ValueError(f"Candidate mapping disagrees with reference TU membership: {candidate_id}, {tu_id}")
             connection.execute("INSERT OR IGNORE INTO candidate_tus(run_id, candidate_id, tu_id) VALUES (?, ?, ?)", (run_id, candidate_id, tu_id))
         if promoter_id:
             if tu_id:
-                connection.execute("INSERT OR IGNORE INTO tu_promoters(tu_id, promoter_id) VALUES (?, ?)", (tu_id, promoter_id))
+                if not connection.execute("SELECT 1 FROM tu_promoters WHERE tu_id=? AND promoter_id=?", (tu_id, promoter_id)).fetchone():
+                    raise ValueError(f"Candidate mapping disagrees with reference promoter membership: {tu_id}, {promoter_id}")
             connection.execute("INSERT OR IGNORE INTO candidate_promoters(run_id, candidate_id, promoter_id) VALUES (?, ?, ?)", (run_id, candidate_id, promoter_id))
             connection.execute("INSERT OR IGNORE INTO promoter_genes(promoter_id, gene_id, relationship) VALUES (?, ?, 'candidate')", (promoter_id, candidate_id))
 
@@ -509,7 +523,8 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
     inputs = _required_files(root, config)
     release = json.loads((root / "results/regulatory_network/scoring_provenance.json").read_text())["regulondb_release"]
     _verify_reference_files(root, release)
-    input_hash, hashes = _input_hashes(root, inputs)
+    code = source_provenance()
+    input_hash, hashes = _input_hashes(root, inputs, code["code_sha256"])
     run_id = f"run-{input_hash[:16]}"
     database_path.parent.mkdir(parents=True, exist_ok=True)
     temp_handle, temp_name = tempfile.mkstemp(prefix="promoter-discovery-", suffix=".sqlite", dir=database_path.parent)
@@ -519,14 +534,15 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
     try:
         connection = open_database(temp_path)
         with transaction(connection):
-            _insert_run(connection, run_id, input_hash, hashes["config/benchmark.json"], release)
+            _insert_run(connection, run_id, input_hash, hashes["config/benchmark.json"], release, code)
             _insert_assets(connection, root, run_id, inputs, hashes, release)
             _insert_antibiotics(connection)
             contrast_ids = _insert_de(connection, root, run_id, config)
             _insert_pairwise(connection, root, run_id, config)
-            _insert_samples(connection, root, run_id)
+            _insert_samples(connection, root, run_id, config)
             _insert_reference_network(connection, root, run_id, release)
             _insert_candidates(connection, root, run_id)
+            insert_identifiers(connection, root, run_id, release)
             _insert_promoters(connection, root, run_id)
             _insert_panel(connection, root, run_id)
             _insert_regulatory_sites(connection, root)
@@ -538,10 +554,13 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
             if connection.execute("PRAGMA foreign_key_check").fetchone():
                 raise ValueError("Database contains broken foreign-key relationships")
             coverage = _reference_coverage(connection, root)
+            coverage.update(_candidate_coverage(connection, run_id))
             connection.execute("UPDATE analysis_runs SET status='complete', summary_json=? WHERE run_id=?", (json.dumps({"input_files": len(inputs), "reference_coverage": coverage}), run_id))
         connection.execute("PRAGMA journal_mode = DELETE")
         close_database(connection)
         connection = None
+        preserve_snapshot(database_path, run_id, SCHEMA_VERSION)
+        prepare_replacement(database_path)
         os.replace(temp_path, database_path)
     except Exception:
         if connection is not None:
@@ -551,6 +570,17 @@ def build_database(root: str | Path = ".", database_path: str | Path = DEFAULT_D
         Path(f"{temp_path}-shm").unlink(missing_ok=True)
         raise
     return database_path
+
+
+def _candidate_coverage(connection, run_id: str) -> dict:
+    total, mapped = connection.execute(
+        "SELECT COUNT(*),COALESCE(SUM(EXISTS(SELECT 1 FROM candidate_promoters p "
+        "WHERE p.run_id=c.run_id AND p.candidate_id=c.candidate_id)),0) "
+        "FROM candidates c WHERE c.run_id=?", (run_id,),
+    ).fetchone()
+    return {"candidate_genes": total, "candidate_genes_with_promoters": mapped,
+            "candidate_genes_without_promoters": total - mapped,
+            "candidate_promoter_mapping_fraction": mapped / total if total else None}
 
 
 def _reference_coverage(connection, root: Path) -> dict:

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Promoter explorer</title>
+<title>PRISM · Promoter explorer</title>
 <style>
 @font-face{font-family:Geist;src:url('/static/fonts/Geist.ttf') format('truetype');font-weight:100 900;font-style:normal;font-display:swap}
 @font-face{font-family:'Source Serif 4';src:url('/static/fonts/SourceSerif4.ttf') format('truetype');font-weight:200 900;font-style:normal;font-display:swap}
@@ -18,9 +18,11 @@
 h1,h2,h3,strong,summary,th,.primary,.secondary{font-family:Geist,Arial,sans-serif;font-weight:700}
 header{padding:40px max(24px,calc((100vw - 1452px)/2));border-bottom:1px solid var(--border)}
 h1{font-size:48px;line-height:1.12;letter-spacing:-.035em;margin:0 0 16px}
+header .header-art{display:block;width:100%;max-width:1200px;height:auto;margin:0 auto 24px}
 header p{margin:0;color:var(--northern);max-width:900px;font-size:16px}
 main{max-width:1500px;margin:auto;padding:32px 24px}
-form{display:grid;grid-template-columns:minmax(210px,1.6fr) repeat(2,minmax(145px,1fr)) repeat(2,minmax(125px,.8fr)) auto;gap:16px;align-items:end;margin-bottom:24px}
+form{display:grid;grid-template-columns:minmax(210px,1.6fr) repeat(2,minmax(145px,1fr)) repeat(2,minmax(125px,.8fr)) auto;gap:16px;align-items:start;margin-bottom:24px}
+.field-label{min-height:42px}form>.primary{margin-top:50px}
 label{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--periwinkle);min-width:0}
 input,select{width:100%;min-width:0;max-width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:0;background:var(--ebony);color:var(--periwinkle)}
 input::placeholder{color:var(--northern);opacity:.8}select option{background:var(--ebony);color:var(--periwinkle)}
@@ -30,6 +32,9 @@ input::placeholder{color:var(--northern);opacity:.8}select option{background:var
 .primary:hover{background:var(--lime);border-color:var(--lime)}
 .secondary{border:1px solid var(--periwinkle);background:transparent;color:var(--periwinkle)}
 .secondary:hover{border-color:var(--fluorescence);background:rgb(0 255 146 / 7%)}
+.field-error{color:var(--orchid);font-family:Geist,Arial,sans-serif;font-size:14px;line-height:1.4}
+input[aria-invalid=true],select[aria-invalid=true]{border:2px solid var(--orchid)}
+#form-errors{margin:0 0 24px;padding:12px 16px;border-left:3px solid var(--orchid)}
 .status{font-size:14px;color:var(--northern);margin:8px 0;min-height:22px}
 .layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px}
 .card{border:1px solid var(--border);border-radius:0;background:var(--surface);padding:26px;margin-bottom:24px}
@@ -66,20 +71,25 @@ details{margin:16px 0}details.card{margin:0 0 24px}summary{cursor:pointer;font-s
 details[open]>summary{margin-bottom:20px}.empty{padding:32px;color:var(--northern)}.error{color:var(--orchid)}.hidden{display:none}
 @media(max-width:1100px){form{grid-template-columns:repeat(3,minmax(0,1fr))}.layout{grid-template-columns:240px minmax(0,1fr)}}
 @media(max-width:850px){main{padding:24px 16px}header{padding:32px 16px}h1{font-size:36px}h2{font-size:28px}form{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.candidate-list{max-height:230px}.card{padding:20px}}
-@media(max-width:480px){form{grid-template-columns:1fr}h1{font-size:32px}.toolbar{align-items:stretch}.toolbar>button{width:100%}.card{padding:16px}th,td{padding:12px 10px}}
+@media(max-width:480px){.field-label{min-height:0}form>.primary{margin-top:0}form{grid-template-columns:1fr}h1{font-size:32px}.toolbar{align-items:stretch}.toolbar>button{width:100%}.card{padding:16px}th,td{padding:12px 10px}}
 </style>
 </head>
 <body>
-<header><h1>Promoter explorer</h1><p>Explore candidate responses, promoters, and curated regulatory relationships.</p></header>
+<header>
+<img class="header-art" src="/static/images/prism-header.svg" width="4200" height="2470" alt="PRISM: expression data and regulatory annotations are linked to prioritize candidate promoters for experimental review.">
+<h1>Promoter explorer</h1><p>Promoter Response Index and Selection Map</p>
+<p id="database-context" class="status">Explore candidate responses, promoters, and curated regulatory relationships.</p>
+</header>
 <main>
-<form id="search">
-<label>Gene or candidate<input name="query" placeholder="Search by name, e.g. pdhR"></label>
-<label>Antibiotic class<select name="class"><option value="">All classes</option><option value="beta_lactam">Beta-lactams</option><option value="aminoglycoside">Aminoglycosides</option><option value="cross">Both classes</option></select></label>
-<label>Support tier<select name="support_tier" id="tiers"><option value="">All support tiers</option></select></label>
-<label>Maximum adjusted p-value<input name="padj_max" type="number" min="0" max="1" step="any" placeholder="e.g. 0.05"></label>
-<label>Minimum |log₂ change|<input name="effect_min" type="number" min="0" step="any" placeholder="e.g. 1"></label>
+<form id="search" novalidate>
+<label><span class="field-label">Gene, locus or candidate</span><input name="query" placeholder="e.g. pdhR or b0113"></label>
+<label><span class="field-label">Antibiotic class</span><select name="class"><option value="">All classes</option><option value="beta_lactam">Beta-lactams</option><option value="aminoglycoside">Aminoglycosides</option><option value="cross">Both classes</option></select></label>
+<label><span class="field-label">Support tier</span><select name="support_tier" id="tiers"><option value="">All support tiers</option></select></label>
+<label><span class="field-label">Maximum adjusted p-value</span><input id="padj-max" aria-label="Maximum adjusted p-value" aria-describedby="padj-max-error" name="padj_max" type="number" min="0" max="1" step="any" placeholder="e.g. 0.05"><span id="padj-max-error" class="field-error" hidden></span></label>
+<label><span class="field-label">Minimum |log₂ change|</span><input id="effect-min" aria-label="Minimum absolute log₂ change" aria-describedby="effect-min-error" name="effect_min" type="number" min="0" step="any" placeholder="e.g. 1"><span id="effect-min-error" class="field-error" hidden></span></label>
 <button class="primary" type="submit">Search</button>
 </form>
+<div id="form-errors" class="error" role="alert" hidden></div>
 <div class="toolbar"><div id="status" class="status" role="status" aria-live="polite">Loading database…</div><button id="panel" class="secondary">View selected panel</button></div>
 <div class="layout"><aside><div id="candidates" class="candidate-list" aria-label="Candidates"></div></aside><section id="content"><div class="card empty">Select a candidate to explore its regulatory context.</div></section></div>
 </main>
@@ -111,9 +121,13 @@ async function api(path, params = {}) {
       run_id: runId
     } : {})
   });
-  const r = await fetch(path + '?' + query);
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'Request failed');
+  let r;
+  try { r = await fetch(path + '?' + query); }
+  catch { throw new Error('Could not connect to the explorer. Check that the local server is running, then try again.'); }
+  let data;
+  try { data = await r.json(); }
+  catch { throw new Error('The explorer returned an unreadable response. Please try again.'); }
+  if (!r.ok) throw new Error(data.error || 'The request could not be completed. Please try again.');
   return data;
 }
 
@@ -159,12 +173,42 @@ function list(rows) {
     $('candidates').append(b);
   });
 }
+const numericFilters = [
+  {id: 'padj-max', max: 1, message: 'Enter a number from 0 to 1, such as 0.05, or leave this blank.'},
+  {id: 'effect-min', max: Infinity, message: 'Enter a finite number of 0 or greater, such as 1, or leave this blank.'}
+];
+function validateField(rule) {
+  const field = $(rule.id), message = $(rule.id + '-error');
+  const value = field.value.trim();
+  const invalid = field.validity.badInput || (value !== '' &&
+    (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > rule.max));
+  field.setAttribute('aria-invalid', String(invalid));
+  message.textContent = invalid ? rule.message : '';
+  message.hidden = !invalid;
+  return !invalid;
+}
+function validateFilters(focus = false) {
+  const invalid = numericFilters.filter(rule => !validateField(rule));
+  $('form-errors').hidden = invalid.length === 0;
+  $('form-errors').textContent = invalid.length
+    ? 'Search not updated. Correct the highlighted ' + (invalid.length === 1 ? 'field' : 'fields') + ' and search again.' : '';
+  if (focus && invalid.length) $(invalid[0].id).focus();
+  return invalid.length === 0;
+}
+numericFilters.forEach(rule => {
+  $(rule.id).addEventListener('blur', () => validateField(rule));
+  $(rule.id).addEventListener('input', () => {
+    if ($(rule.id).getAttribute('aria-invalid') === 'true' || !$('form-errors').hidden)
+      validateFilters();
+  });
+});
 async function search() {
+  if (!validateFilters(true)) { ++searchVersion; return; }
   const version = ++searchVersion;
   try {
     const params = {};
     for (const [key, value] of new FormData($('search')))
-      if (value) params[key] = value;
+      if (value.trim()) params[key] = value.trim();
     const rows = await api('/api/candidates', params);
     if (version !== searchVersion) return;
     if ($('tiers').options.length === 1) {
@@ -191,6 +235,7 @@ $('panel').onclick = async () => {
     const rows = await api('/api/panel');
     if (version !== searchVersion) return;
     list(rows);
+    $('status').classList.remove('error');
     $('status').textContent = rows.length + ' proposed panel members';
   } catch (e) {
     fail(e);
@@ -229,6 +274,8 @@ function renderCandidate(c, graph) {
   });
   intro.append(el('p', c.promoters.length + ' promoters · ' + c.transcription_units.length +
     ' transcription units', 'muted'));
+  const identifiers = [...new Set((c.identifiers || []).filter(i => i.namespace !== 'gene_symbol').map(i => i.identifier))];
+  if (identifiers.length) intro.append(el('p', 'Source identifiers: ' + identifiers.join(', '), 'muted'));
   content.append(intro);
   const network = el('div', null, 'card');
   network.append(el('h3', 'Regulatory context'));
@@ -247,6 +294,18 @@ function renderCandidate(c, graph) {
     .evidence.map(e => [e.contrast_id.replace(c.run_id + ':', ''), e.source_gene_id, (e.evidence_role ||
       '').replaceAll('_', ' '), number(e.effect), number(e.padj)])));
   content.append(responses);
+  if (c.experimental_context?.length) {
+    const context = el('details', null, 'card');
+    context.append(el('summary', 'Source-study growth and exposure conditions'));
+    context.append(el('p', 'Literature-curated context. Unknown concentrations and exposure times remain unknown; these are not reporter measurements.', 'muted'));
+    context.append(table(['Condition', 'Medium', 'Growth phase', 'Dose basis', 'Concentration', 'Exposure (min)'],
+      c.experimental_context.map(row => [conditionName(row.condition), row.medium || 'unknown',
+        row.growth_phase || 'unknown', row.concentration_basis || 'unknown',
+        row.concentration == null ? 'unknown' : number(row.concentration) + ' ' + row.concentration_unit,
+        row.exposure_minutes == null ? 'unknown' : number(row.exposure_minutes)])));
+    [...new Set(c.experimental_context.map(row => row.source_reference).filter(Boolean))].forEach(source => context.append(el('p', 'Source: ' + source, 'muted')));
+    content.append(context);
+  }
   if (c.assessments?.length || c.replicates?.length) {
     const assessment = el('details', null, 'card');
     assessment.append(el('summary', 'Stability, cross-reactivity & replicates'));
@@ -486,11 +545,10 @@ async function init() {
     if (!latest) throw new Error('No completed analysis run available.');
     runId = latest.run_id;
     const coverage = await api('/api/coverage');
-    document.querySelector('header p').textContent = latest.run_id.startsWith('demo-')
+    $('database-context').textContent = latest.run_id.startsWith('demo-')
       ? 'Fictional software example · No experimental measurements or biological claims'
       : 'RegulonDB ' + latest.reference_release + ' · ' + (
-      coverage.regulatory_interactions ?? '—') + ' curated interactions · ' + (coverage
-      .interactions_without_promoter ?? '—') + ' without a promoter link';
+      coverage.regulatory_interactions ?? '—') + ' curated interactions';
     await search();
   } catch (e) {
     fail(e);

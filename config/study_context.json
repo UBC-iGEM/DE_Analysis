@@ -1,0 +1,16 @@
+{
+  "study_id": "GSE220559",
+  "source_reference": "https://doi.org/10.1128/spectrum.00317-23",
+  "source_section": "Materials and Methods: Bacterial growth and RNA extraction; Determination of IC50",
+  "curation_note": "Literature-curated study context, not a new measurement. Cultures were grown in MHB to mid-logarithmic phase. Numeric drug concentrations from Table S1 have not been curated here; elapsed RNA-sampling exposure time is not specified in this methods section. Both remain null. Do not infer a fixed exposure duration from the separate growth-curve experiment.",
+  "medium": "Mueller-Hinton broth (MHB)",
+  "growth_phase": "mid-logarithmic",
+  "conditions": {
+    "water": {"antibiotic_id": null, "concentration_basis": "no antibiotic added", "concentration": null, "concentration_unit": null, "exposure_minutes": null},
+    "benchmark_ceftazidime": {"antibiotic_id": "ceftazidime", "concentration_basis": "study-specific IC50 (50% growth inhibition)", "concentration": null, "concentration_unit": null, "exposure_minutes": null},
+    "benchmark_imipenem": {"antibiotic_id": "imipenem", "concentration_basis": "study-specific IC50 (50% growth inhibition)", "concentration": null, "concentration_unit": null, "exposure_minutes": null},
+    "benchmark_kanamycin": {"antibiotic_id": "kanamycin", "concentration_basis": "study-specific IC50 (50% growth inhibition)", "concentration": null, "concentration_unit": null, "exposure_minutes": null},
+    "benchmark_ciprofloxacin": {"antibiotic_id": "ciprofloxacin", "concentration_basis": "study-specific IC50 (50% growth inhibition)", "concentration": null, "concentration_unit": null, "exposure_minutes": null},
+    "benchmark_polymyxin_e": {"antibiotic_id": "polymyxin_e", "concentration_basis": "study-specific IC50 (50% growth inhibition)", "concentration": null, "concentration_unit": null, "exposure_minutes": null}
+  }
+}

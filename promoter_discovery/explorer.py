@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sqlite3
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -18,12 +19,27 @@ def query_database(database: Database, path: str, parameters: dict[str, list[str
     def value(key):
         return parameters.get(key, [None])[0] or None
 
+    def numeric_filter(key, label, maximum=None):
+        raw = value(key)
+        if raw is None or not raw.strip():
+            return None
+        message = (f"{label}: enter a number from 0 to 1, or leave it blank."
+                   if maximum is not None else
+                   f"{label}: enter a finite number of 0 or greater, or leave it blank.")
+        try:
+            number = float(raw)
+        except ValueError:
+            raise ValueError(message) from None
+        if not math.isfinite(number) or number < 0 or (maximum is not None and number > maximum):
+            raise ValueError(message)
+        return number
+
     run_id = value("run_id")
     if path == "/api/candidates":
         return database.search_candidates(
             antibiotic_class=value("class"), support_tier=value("support_tier"),
-            padj_max=float(value("padj_max")) if value("padj_max") else None,
-            effect_min=float(value("effect_min")) if value("effect_min") else None,
+            padj_max=numeric_filter("padj_max", "Maximum adjusted p-value", 1),
+            effect_min=numeric_filter("effect_min", "Minimum absolute log2 change"),
             run_id=run_id, query=value("query"),
         )
     if path == "/api/runs":
@@ -63,6 +79,9 @@ def create_server(database_path: str | Path, port: int = 8000) -> HTTPServer:
             if url.path in fonts:
                 body = (page.parent / "static/fonts" / fonts[url.path]).read_bytes()
                 self.respond(200, body, "font/ttf")
+                return
+            if url.path == "/static/images/prism-header.svg":
+                self.respond(200, (page.parent / "static/images/prism-header.svg").read_bytes(), "image/svg+xml")
                 return
             if not url.path.startswith("/api/"):
                 self.respond(404, b"Not found", "text/plain; charset=utf-8")

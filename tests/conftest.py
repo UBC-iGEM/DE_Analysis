@@ -37,6 +37,13 @@ def database_root(tmp_path):
     }
     for relative, data in (
         ("config/benchmark.json", config),
+        ("config/study_context.json", {
+            "study_id": "GSE220559", "source_reference": "synthetic fixture",
+            "source_section": "fixture", "curation_note": "Fictional context; no biological claims",
+            "medium": "test medium", "growth_phase": "test phase",
+            "conditions": {"benchmark_ceftazidime": {"antibiotic_id": "ceftazidime",
+                                                      "concentration_basis": "not measured"}},
+        }),
         ("config/regulondb.lock.json", {"assets": {}}),
         ("results/differential_expression/model/benchmark_provenance.json", {}),
         ("results/regulatory_network/scoring_provenance.json", {"regulondb_release": "14.5.0"}),
@@ -44,6 +51,10 @@ def database_root(tmp_path):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data))
+
+    _write_csv(root / "results/differential_expression/model/joint_metadata.csv", [
+        {"sample_id": "S1", "source_file": "S1.txt", "condition": "benchmark_ceftazidime", "replicate": "1"}
+    ])
 
     for observed in ("ceftazidime", "kanamycin"):
         _write_csv(

@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 11
-DEFAULT_DATABASE = Path("results/promoter_discovery.sqlite")
+SCHEMA_VERSION = 12
+DEFAULT_DATABASE = Path("results/prism.sqlite")
 
 
 SCHEMA_SQL = """
@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS analysis_runs (
     status TEXT NOT NULL CHECK (status IN ('building', 'complete', 'failed')),
     pipeline_version TEXT,
     git_revision TEXT,
+    code_sha256 TEXT,
+    code_dirty INTEGER CHECK (code_dirty IN (0, 1) OR code_dirty IS NULL),
+    code_manifest_json TEXT,
     config_sha256 TEXT,
     input_sha256 TEXT,
     reference_release TEXT,
@@ -44,6 +47,7 @@ CREATE TABLE IF NOT EXISTS assets (
     source_release TEXT,
     sha256 TEXT NOT NULL,
     size_bytes INTEGER,
+    UNIQUE (run_id, asset_id),
     UNIQUE (run_id, path, sha256)
 );
 
@@ -83,6 +87,43 @@ CREATE TABLE IF NOT EXISTS genes (
     locus_tag TEXT,
     aliases_json TEXT,
     regulondb_id TEXT UNIQUE
+);
+
+-- Identifier associations preserve distinct source loci and ambiguous symbols.
+-- They do not assert that all records sharing a symbol are the same locus.
+CREATE TABLE IF NOT EXISTS gene_identifiers (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    gene_id TEXT NOT NULL REFERENCES genes(gene_id),
+    namespace TEXT NOT NULL,
+    identifier TEXT NOT NULL COLLATE NOCASE,
+    source_asset_id TEXT NOT NULL,
+    source_row INTEGER NOT NULL CHECK (source_row >= 0),
+    source_release TEXT NOT NULL,
+    mapping_basis TEXT NOT NULL,
+    PRIMARY KEY (run_id, gene_id, namespace, identifier, source_row),
+    FOREIGN KEY (run_id, source_asset_id) REFERENCES assets(run_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gene_identifier ON gene_identifiers(run_id, identifier);
+
+CREATE TABLE IF NOT EXISTS sample_exposures (
+    run_id TEXT NOT NULL REFERENCES analysis_runs(run_id),
+    study_id TEXT NOT NULL,
+    sample_id TEXT NOT NULL,
+    antibiotic_id TEXT REFERENCES antibiotics(antibiotic_id),
+    medium TEXT,
+    growth_phase TEXT,
+    concentration REAL CHECK (concentration >= 0 OR concentration IS NULL),
+    concentration_unit TEXT,
+    concentration_basis TEXT,
+    exposure_minutes REAL CHECK (exposure_minutes >= 0 OR exposure_minutes IS NULL),
+    source_asset_id TEXT NOT NULL,
+    source_reference TEXT NOT NULL,
+    curation_note TEXT NOT NULL,
+    PRIMARY KEY (run_id, study_id, sample_id),
+    FOREIGN KEY (study_id, sample_id) REFERENCES samples(study_id, sample_id),
+    FOREIGN KEY (run_id, source_asset_id) REFERENCES assets(run_id, asset_id),
+    CHECK ((concentration IS NULL AND concentration_unit IS NULL) OR
+           (concentration IS NOT NULL AND length(trim(concentration_unit)) > 0 AND concentration_unit IS NOT NULL))
 );
 
 CREATE TABLE IF NOT EXISTS regulators (
@@ -179,7 +220,8 @@ CREATE TABLE IF NOT EXISTS contrasts (
     effect_cutoff REAL,
     padj_cutoff REAL,
     metadata_json TEXT,
-    UNIQUE (run_id, name)
+    UNIQUE (run_id, name),
+    UNIQUE (run_id, contrast_id)
 );
 
 CREATE TABLE IF NOT EXISTS de_results (
@@ -198,7 +240,10 @@ CREATE TABLE IF NOT EXISTS de_results (
     regulation TEXT,
     eligible INTEGER NOT NULL DEFAULT 1 CHECK (eligible IN (0, 1)),
     source_row_id TEXT,
-    PRIMARY KEY (run_id, contrast_id, gene_id)
+    PRIMARY KEY (run_id, contrast_id, gene_id),
+    FOREIGN KEY (run_id, contrast_id) REFERENCES contrasts(run_id, contrast_id),
+    CHECK (p_value IS NULL OR p_value BETWEEN 0 AND 1),
+    CHECK (padj IS NULL OR padj BETWEEN 0 AND 1)
 );
 
 CREATE TABLE IF NOT EXISTS regulatory_edges (
@@ -321,7 +366,8 @@ CREATE TABLE IF NOT EXISTS replicate_metrics (
     standard_deviation REAL,
     coefficient_of_variation REAL,
     metrics_json TEXT,
-    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id)
+    FOREIGN KEY (run_id, candidate_id) REFERENCES candidates(run_id, candidate_id),
+    FOREIGN KEY (run_id, contrast_id) REFERENCES contrasts(run_id, contrast_id)
 );
 
 CREATE TABLE IF NOT EXISTS candidate_assessments (
@@ -518,10 +564,14 @@ CREATE VIEW IF NOT EXISTS reference_promoter_paths AS
 SELECT * FROM reference_regulatory_paths;
 
 CREATE VIEW IF NOT EXISTS sample_qc_summary AS
-SELECT q.run_id, q.sample_id, s.condition, s.source_file,
+SELECT q.run_id, q.sample_id, s.condition, s.source_file, s.replicate, s.antibiotic_role,
+       e.antibiotic_id, e.medium, e.growth_phase, e.concentration,
+       e.concentration_unit, e.concentration_basis, e.exposure_minutes,
+       e.source_reference, e.curation_note,
        q.library_size, q.genes_detected, q.pc1, q.pc2
 FROM sample_qc q
-JOIN samples s ON s.study_id = q.study_id AND s.sample_id = q.sample_id;
+JOIN samples s ON s.study_id = q.study_id AND s.sample_id = q.sample_id
+LEFT JOIN sample_exposures e ON e.run_id=q.run_id AND e.study_id=q.study_id AND e.sample_id=q.sample_id;
 """
 
 

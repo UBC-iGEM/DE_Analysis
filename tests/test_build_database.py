@@ -19,7 +19,7 @@ def test_build_database_links_all_fixture_evidence(database_root, tmp_path):
                       "candidate_promoters", "candidate_panels")
     }
     assert counts == {
-        "assets": 23, "contrasts": 3, "de_results": 6, "candidates": 1,
+        "assets": 25, "contrasts": 3, "de_results": 6, "candidates": 1,
         "candidate_evidence": 3, "regulatory_edges": 1, "regulatory_interactions": 2,
         "transcription_units": 2, "tu_genes": 3, "candidate_tus": 1, "candidate_promoters": 1,
         "candidate_panels": 1,
