@@ -29,6 +29,7 @@ def _write_tsv(path, rows):
 def database_root(tmp_path):
     root = tmp_path / "project"
     config = {
+        "benchmark": {"wetlab_antibiotics": ["amoxicillin", "cephalexin", "gentamicin", "tobramycin"]},
         "datasets": [
             {"name": "benchmark_ceftazidime", "treatment": "ceftazidime", "output_directory": "ceftazidime", "role": "discovery"},
             {"name": "benchmark_kanamycin", "treatment": "kanamycin", "output_directory": "kanamycin", "role": "cross_reactivity_challenge"},
@@ -36,6 +37,13 @@ def database_root(tmp_path):
     }
     for relative, data in (
         ("config/benchmark.json", config),
+        ("config/study_context.json", {
+            "study_id": "GSE220559", "source_reference": "synthetic fixture",
+            "source_section": "fixture", "curation_note": "Fictional context; no biological claims",
+            "medium": "test medium", "growth_phase": "test phase",
+            "conditions": {"benchmark_ceftazidime": {"antibiotic_id": "ceftazidime",
+                                                      "concentration_basis": "not measured"}},
+        }),
         ("config/regulondb.lock.json", {"assets": {}}),
         ("results/differential_expression/model/benchmark_provenance.json", {}),
         ("results/regulatory_network/scoring_provenance.json", {"regulondb_release": "14.5.0"}),
@@ -43,6 +51,10 @@ def database_root(tmp_path):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data))
+
+    _write_csv(root / "results/differential_expression/model/joint_metadata.csv", [
+        {"sample_id": "S1", "source_file": "S1.txt", "condition": "benchmark_ceftazidime", "replicate": "1"}
+    ])
 
     for observed in ("ceftazidime", "kanamycin"):
         _write_csv(
@@ -101,6 +113,19 @@ def database_root(tmp_path):
          "promoter_id": "P1", "regulondb_release": "14.5.0"}
     ])
     assessment = root / "results/candidate_assessment"
+    _write_csv(assessment / "candidate_replicates.csv", [
+        {"gene": "genea", "gene_id": "b0001", "source_dataset": "benchmark_ceftazidime",
+         "condition": "benchmark_ceftazidime", "mean": 20, "sd": 2, "cv": 0.1,
+         "sample_values_json": '{"S1": 18, "S2": 20, "S3": 22}'}
+    ])
+    _write_csv(assessment / "candidate_stability.csv", [
+        {"gene": "genea", "antibiotic_class": "beta_lactam", "screen_fraction": 1,
+         "n_screens_selected": 9, "n_screens": 9}
+    ])
+    _write_csv(assessment / "cross_reactivity.csv", [
+        {"gene": "genea", "antibiotic_class": "beta_lactam", "counterpart_dataset": "benchmark_kanamycin",
+         "direct_status": "inconclusive", "family_padj": 0.2}
+    ])
     _write_csv(assessment / "experimental_panel.csv", [
         {"gene": "genea", "promoter_id": "P1", "antibiotic_class": "beta_lactam",
          "selection_order": 1, "selection_basis": "test", "transcription_group": "T1"}

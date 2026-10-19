@@ -1,4 +1,4 @@
-"""Command-line searches for the generated promoter-discovery database."""
+"""Command-line searches for the generated PRISM database."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def main(argv=None) -> None:
     candidates.add_argument("--padj-max", type=float)
     candidates.add_argument("--effect-min", type=float)
     candidates.add_argument("--run-id")
-    candidates.add_argument("--query", help="match a candidate ID or gene name")
+    candidates.add_argument("--query", help="match a candidate ID, gene symbol, or imported source/locus identifier")
 
     candidate = subparsers.add_parser("candidate", help="show one candidate and its evidence")
     candidate.add_argument("candidate_id")
@@ -60,6 +60,7 @@ def main(argv=None) -> None:
 
     qc = subparsers.add_parser("qc", help="show sample quality-control records")
     qc.add_argument("--run-id")
+    subparsers.add_parser("runs", help="show analysis input and source-code provenance")
 
     coverage = subparsers.add_parser("coverage", help="show reference import and mapping coverage")
     coverage.add_argument("--run-id")
@@ -87,7 +88,7 @@ def main(argv=None) -> None:
 
     args = parser.parse_args(argv)
     try:
-        database = Database(args.database)
+        database = Database(args.database, read_only=not args.command.startswith("review-"))
     except (FileNotFoundError, ValueError) as error:
         parser.error(str(error))
     try:
@@ -106,6 +107,8 @@ def main(argv=None) -> None:
             rows = database.panel(args.panel_id, args.run_id)
         elif args.command == "coverage":
             rows = [database.reference_coverage(args.run_id)]
+        elif args.command == "runs":
+            rows = database.runs()
         elif args.command == "network":
             result = database.candidate_network(args.candidate_id, args.run_id)
             rows = [result] if result else []

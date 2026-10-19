@@ -1,24 +1,43 @@
-"""Small read-oriented Python API for the generated project database."""
+"""Small read-oriented Python API for the generated PRISM database."""
 
 from __future__ import annotations
 
 import json
+import math
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from .database import DEFAULT_DATABASE, open_database
+from .database import DEFAULT_DATABASE, SCHEMA_VERSION, open_database, schema_version
 from .curation import archive_path, archive_review, attach_archive, review_history
 
 
 class Database:
     """Convenience queries that return dictionaries suitable for scripts or JSON."""
 
-    def __init__(self, path: str | Path = DEFAULT_DATABASE):
+    def __init__(self, path: str | Path = DEFAULT_DATABASE, *, read_only: bool = False):
         self.path = Path(path).resolve()
         if not self.path.is_file():
             raise FileNotFoundError(f"Database not found: {self.path}. Run python -m promoter_discovery.build_database")
-        self.connection = open_database(self.path)
+        if read_only:
+            self.connection = sqlite3.connect(f"{self.path.as_uri()}?mode=ro", uri=True)
+            self.connection.row_factory = sqlite3.Row
+            self.connection.execute("PRAGMA foreign_keys = ON")
+            try:
+                if schema_version(self.connection) != SCHEMA_VERSION:
+                    raise ValueError("Unsupported database schema; run python -m promoter_discovery.build_database")
+            except Exception:
+                self.connection.close()
+                raise
+        else:
+            self.connection = open_database(self.path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
 
     def close(self) -> None:
         self.connection.close()
@@ -50,12 +69,12 @@ class Database:
         run_id: str | None = None,
         query: str | None = None,
     ) -> list[dict]:
-        if antibiotic_class is not None and antibiotic_class not in {"beta_lactam", "aminoglycoside"}:
-            raise ValueError("class must be beta_lactam or aminoglycoside")
+        if antibiotic_class is not None and antibiotic_class not in {"beta_lactam", "aminoglycoside", "cross"}:
+            raise ValueError("class must be beta_lactam, aminoglycoside, or cross")
         if padj_max is not None and not 0 <= padj_max <= 1:
             raise ValueError("padj_max must be between 0 and 1")
-        if effect_min is not None and effect_min < 0:
-            raise ValueError("effect_min must be nonnegative")
+        if effect_min is not None and (not math.isfinite(effect_min) or effect_min < 0):
+            raise ValueError("effect_min must be finite and nonnegative")
         clauses = []
         parameters: list[object] = []
         if antibiotic_class:
@@ -67,8 +86,10 @@ class Database:
         clauses.append("c.run_id = ?")
         parameters.append(self._run_id(run_id))
         if query:
-            clauses.append("(instr(lower(c.candidate_id), lower(?)) > 0 OR instr(lower(c.canonical_name), lower(?)) > 0)")
-            parameters.extend((query, query))
+            clauses.append("(instr(lower(c.candidate_id), lower(?)) > 0 OR instr(lower(c.canonical_name), lower(?)) > 0 "
+                           "OR EXISTS(SELECT 1 FROM gene_identifiers i WHERE i.run_id=c.run_id AND i.gene_id=c.gene_id "
+                           "AND instr(lower(i.identifier),lower(?)) > 0))")
+            parameters.extend((query, query, query))
         if padj_max is not None or effect_min is not None:
             evidence_clauses = [
                 "e.run_id = c.run_id",
@@ -88,7 +109,27 @@ class Database:
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         return self._rows("SELECT * FROM candidate_summary c" + where + " ORDER BY c.ranking_score DESC NULLS LAST", parameters)
 
+    def _resolve_candidate_id(self, identifier: str, run_id: str | None) -> str | None:
+        """Resolve exact IDs first; an ambiguous alias must never pick a winner."""
+        exact = self.connection.execute(
+            "SELECT candidate_id FROM candidates WHERE run_id=? AND lower(candidate_id)=lower(?)",
+            (run_id, identifier),
+        ).fetchall()
+        matches = exact or self.connection.execute(
+            "SELECT DISTINCT c.candidate_id FROM candidates c JOIN gene_identifiers i "
+            "ON i.run_id=c.run_id AND i.gene_id=c.gene_id WHERE c.run_id=? AND i.identifier=? COLLATE NOCASE",
+            (run_id, identifier),
+        ).fetchall()
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous identifier {identifier!r}; use a candidate ID: "
+                             + ", ".join(sorted(row[0] for row in matches)))
+        return matches[0][0] if matches else None
+
     def get_candidate(self, candidate_id: str, run_id: str | None = None) -> dict | None:
+        run_id = self._run_id(run_id)
+        candidate_id = self._resolve_candidate_id(candidate_id, run_id)
+        if candidate_id is None:
+            return None
         rows = self._rows("SELECT * FROM candidate_summary WHERE lower(candidate_id) = lower(?) AND run_id = ?", (candidate_id, self._run_id(run_id)))
         if not rows:
             return None
@@ -107,6 +148,27 @@ class Database:
             (result["run_id"], candidate_id),
         )
         result["regulatory_paths"] = self.candidate_paths(candidate_id, result["run_id"])
+        result["replicates"] = self._rows(
+            "SELECT * FROM replicate_metrics WHERE run_id=? AND candidate_id=?",
+            (result["run_id"], candidate_id),
+        )
+        result["assessments"] = [
+            {"assessment_type": row["assessment_type"], "metrics": json.loads(row["metrics_json"])}
+            for row in self._rows("SELECT * FROM candidate_assessments WHERE run_id=? AND candidate_id=? ORDER BY assessment_type, source_row",
+                                  (result["run_id"], candidate_id))
+        ]
+        result["identifiers"] = self._rows(
+            "SELECT namespace,identifier,source_asset_id,source_row,source_release,mapping_basis "
+            "FROM gene_identifiers WHERE run_id=? AND gene_id=? ORDER BY namespace,identifier,source_row",
+            (result["run_id"], result["gene_id"]),
+        )
+        result["experimental_context"] = self._rows(
+            "SELECT DISTINCT q.condition,q.antibiotic_id,q.medium,q.growth_phase,q.concentration,"
+            "q.concentration_unit,q.concentration_basis,q.exposure_minutes,q.source_reference,q.curation_note "
+            "FROM sample_qc_summary q WHERE q.run_id=? AND EXISTS "
+            "(SELECT 1 FROM replicate_metrics r WHERE r.run_id=q.run_id AND r.candidate_id=? "
+            "AND r.condition=q.condition) ORDER BY q.condition", (result["run_id"], candidate_id),
+        )
         return result
 
     def search_regulator(self, regulator: str, run_id: str | None = None) -> list[dict]:
@@ -146,6 +208,7 @@ class Database:
     def candidate_paths(self, candidate_id: str, run_id: str | None = None) -> list[dict]:
         """Gene-target effects apply to that gene, never to siblings in its TU."""
         run_id = self._run_id(run_id)
+        candidate_id = self._resolve_candidate_id(candidate_id, run_id)
         candidate = self.connection.execute(
             "SELECT candidate_id, gene_id FROM candidates WHERE lower(candidate_id)=lower(?) AND run_id=?",
             (candidate_id, run_id),
@@ -184,10 +247,14 @@ class Database:
         if candidate is None:
             return None
         nodes, edges = {}, {}
+        tu_names = {row["tu_id"]: row["name"] for row in candidate["transcription_units"]}
 
         def node(kind, identifier, label=None):
             key = f"{kind}:{identifier}"
-            nodes[key] = {"id": key, "entity_id": identifier, "kind": kind, "label": label or identifier}
+            if key not in nodes:
+                nodes[key] = {"id": key, "entity_id": identifier, "kind": kind, "label": label or identifier}
+            elif label:
+                nodes[key]["label"] = label
             return key
 
         gene = node("gene", candidate["gene_id"], candidate["canonical_name"])
@@ -203,7 +270,7 @@ class Database:
                 "target_kind": path["target_kind"],
             }
             promoter = node("promoter", path["promoter_id"], path["promoter_name"]) if path["promoter_id"] else None
-            tu = node("tu", path["tu_id"]) if path["tu_id"] else None
+            tu = node("tu", path["tu_id"], tu_names.get(path["tu_id"])) if path["tu_id"] else None
             for source, target, relation in ((promoter, tu, "promoter–TU association"),
                                               (tu, gene if path["gene_id"] == candidate["gene_id"] else None, "TU membership")):
                 if source and target:

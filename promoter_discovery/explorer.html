@@ -3,54 +3,557 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Promoter explorer</title>
+<title>PRISM · Promoter explorer</title>
 <style>
-:root{font-family:system-ui,sans-serif;color:#24283d;background:#f7f7f3;--muted:#606477;--border:#deded8;--purple:#6d61cf;--mint:#cbe6dd}
-*{box-sizing:border-box}body{margin:0}header{padding:28px 32px;background:#22253f;color:#f3f2ff}h1{font-size:26px;margin:0 0 8px;font-weight:650}header p{margin:0;color:#cbd0e5;font-size:14px}
-main{max-width:1500px;margin:auto;padding:24px}button,input,select{font:inherit}button{cursor:pointer}input,select{border:1px solid var(--border);border-radius:8px;padding:10px;background:white;min-width:0}label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
-form{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:12px;align-items:end;margin-bottom:16px}.primary{background:var(--purple);border:0;border-radius:8px;color:white;padding:11px 20px}.secondary{border:1px solid var(--border);background:white;border-radius:8px;padding:8px 12px;color:#34394e}
-.status{font-size:13px;color:var(--muted);margin:14px 0;min-height:20px}.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px}.card{border:1px solid var(--border);border-radius:12px;background:#fff;padding:22px;margin-bottom:18px}h2{margin:0 0 12px;font-size:21px}h3{font-size:16px;margin:0 0 14px}.muted{color:var(--muted);font-size:13px}.candidate-list{max-height:850px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:white}.candidate{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #eee;background:white;padding:14px 16px;color:#24283d}.candidate:hover,.candidate[aria-current=true]{background:#eef0fc}.candidate strong{display:block}.candidate span{display:block;font-size:12px;color:var(--muted);margin-top:4px}.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}.tag{display:inline-block;font-size:12px;background:#f1effb;border-radius:5px;padding:5px 8px;margin:0 6px 5px 0}.legend{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0;font-size:12px;color:var(--muted)}.legend span:before{content:'';display:inline-block;width:24px;border-top:2px solid #495371;margin-right:6px;vertical-align:middle}.legend .context:before{border-top-style:dashed;border-color:#9ea5b3}.graph{overflow:auto;background:#fafbf9;border-radius:8px;max-height:580px}.graph svg{min-width:760px;display:block;width:100%}.edge-detail{font-size:13px;line-height:1.7;margin-top:12px;color:var(--muted)}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px;text-align:left}th,td{padding:10px;border-bottom:1px solid #e9e9e3;vertical-align:top}th{font-weight:600;color:#606477}code{font-family:ui-monospace,monospace}.sequence{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6;background:#f7f7f3;padding:12px;border-radius:6px}details{margin:12px 0}summary{cursor:pointer;font-size:14px;font-weight:600}.empty{padding:32px;color:var(--muted)}.error{color:#a33030}.hidden{display:none}
-@media(max-width:850px){main{padding:16px}header{padding:24px 16px}form{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}.candidate-list{max-height:230px}.card{padding:16px}}
+@font-face{font-family:Geist;src:url('/static/fonts/Geist.ttf') format('truetype');font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:'Source Serif 4';src:url('/static/fonts/SourceSerif4.ttf') format('truetype');font-weight:200 900;font-style:normal;font-display:swap}
+:root{
+  --ebony:#1b1f41;--periwinkle:#bbd1ff;--fluorescence:#00ff92;--orchid:#e650db;
+  --northern:#88bed4;--lime:#c9fd3a;--cornflower:#6a67ff;--teal:#54a190;--citrine:#ddd200;
+  --muted:var(--northern);--border:rgb(187 209 255 / 24%);--surface:rgb(187 209 255 / 3%);
+  font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:400;line-height:1.5;
+  color:var(--periwinkle);background:var(--ebony);color-scheme:dark;
+}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}
+h1,h2,h3,strong,summary,th,.primary,.secondary{font-family:Geist,Arial,sans-serif;font-weight:700}
+header{padding:40px max(24px,calc((100vw - 1452px)/2));border-bottom:1px solid var(--border)}
+h1{font-size:48px;line-height:1.12;letter-spacing:-.035em;margin:0 0 16px}
+header .header-art{display:block;width:100%;max-width:1200px;height:auto;margin:0 auto 24px}
+header p{margin:0;color:var(--northern);max-width:900px;font-size:16px}
+main{max-width:1500px;margin:auto;padding:32px 24px}
+form{display:grid;grid-template-columns:minmax(210px,1.6fr) repeat(2,minmax(145px,1fr)) repeat(2,minmax(125px,.8fr)) auto;gap:16px;align-items:start;margin-bottom:24px}
+.field-label{min-height:42px}form>.primary{margin-top:50px}
+label{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--periwinkle);min-width:0}
+input,select{width:100%;min-width:0;max-width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:0;background:var(--ebony);color:var(--periwinkle)}
+input::placeholder{color:var(--northern);opacity:.8}select option{background:var(--ebony);color:var(--periwinkle)}
+:focus-visible{outline:2px solid var(--fluorescence);outline-offset:4px}
+.primary,.secondary{border-radius:0;padding:12px 20px;font-size:16px;line-height:1.5;transition:background .15s,border-color .15s}
+.primary{background:var(--fluorescence);color:var(--ebony);border:1px solid var(--fluorescence)}
+.primary:hover{background:var(--lime);border-color:var(--lime)}
+.secondary{border:1px solid var(--periwinkle);background:transparent;color:var(--periwinkle)}
+.secondary:hover{border-color:var(--fluorescence);background:rgb(0 255 146 / 7%)}
+.field-error{color:var(--orchid);font-family:Geist,Arial,sans-serif;font-size:14px;line-height:1.4}
+input[aria-invalid=true],select[aria-invalid=true]{border:2px solid var(--orchid)}
+#form-errors{margin:0 0 24px;padding:12px 16px;border-left:3px solid var(--orchid)}
+.status{font-size:14px;color:var(--northern);margin:8px 0;min-height:22px}
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px}
+.card{border:1px solid var(--border);border-radius:0;background:var(--surface);padding:26px;margin-bottom:24px}
+h2{margin:0 0 16px;font-size:36px;line-height:1.2;letter-spacing:-.025em}
+h3{font-size:24px;line-height:1.25;margin:0 0 20px;letter-spacing:-.015em}
+.muted{color:var(--northern);font-size:14px}
+.candidate-list{max-height:850px;overflow:auto;border:1px solid var(--border);background:transparent;scrollbar-color:var(--northern) var(--ebony)}
+.candidate{display:block;width:100%;text-align:left;border:0;border-left:3px solid transparent;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:18px 16px;color:var(--periwinkle)}
+.candidate:hover{background:rgb(106 103 255 / 10%)}
+.candidate[aria-current=true]{border-left-color:var(--fluorescence);background:rgb(106 103 255 / 17%)}
+.candidate strong{display:block;font-size:18px;line-height:1.3}
+.candidate span{display:block;font-size:14px;color:var(--northern);margin-top:6px}
+.candidate[data-class=beta_lactam] span:first-of-type{color:var(--orchid)}
+.candidate[data-class=aminoglycoside] span:first-of-type{color:var(--lime)}
+.toolbar{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--border);padding:5px 10px;margin:0 8px 8px 0;color:var(--northern)}
+.tag[data-class=beta_lactam]{border-color:var(--orchid);color:var(--orchid)}
+.tag[data-class=aminoglycoside]{border-color:var(--lime);color:var(--lime)}
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin:16px 0;font-size:14px;color:var(--northern)}
+.legend span:before{content:'';display:inline-block;width:24px;border-top:2px solid var(--periwinkle);margin-right:8px;vertical-align:middle}
+.legend .context:before{border-top-style:dashed;border-color:var(--northern)}
+.graph{overflow:auto;background:var(--ebony);border:1px solid var(--border);max-height:580px;scrollbar-color:var(--northern) var(--ebony)}
+.graph svg{min-width:800px;display:block;width:100%}
+.graph path[role=button]:hover,.graph path[role=button]:focus{stroke:var(--fluorescence);stroke-width:3;outline:none}
+.edge-detail{font-size:14px;line-height:1.7;margin-top:20px;color:var(--northern);overflow-wrap:anywhere}
+.edge-detail>strong{display:block;color:var(--periwinkle);font-size:16px;margin-bottom:12px}
+.edge-detail label{margin-bottom:16px}.scroll{overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;text-align:left;font-variant-numeric:tabular-nums}
+th,td{padding:14px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:14px;color:var(--periwinkle)}td{color:var(--periwinkle)}
+tbody tr:hover{background:rgb(187 209 255 / 3%)}
+code{font-family:inherit}.sequence{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7;background:var(--ebony);border:1px solid var(--border);padding:16px}
+details{margin:16px 0}details.card{margin:0 0 24px}summary{cursor:pointer;font-size:16px;color:var(--periwinkle);overflow-wrap:anywhere}
+details[open]>summary{margin-bottom:20px}.empty{padding:32px;color:var(--northern)}.error{color:var(--orchid)}.hidden{display:none}
+@media(max-width:1100px){form{grid-template-columns:repeat(3,minmax(0,1fr))}.layout{grid-template-columns:240px minmax(0,1fr)}}
+@media(max-width:850px){main{padding:24px 16px}header{padding:32px 16px}h1{font-size:36px}h2{font-size:28px}form{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.candidate-list{max-height:230px}.card{padding:20px}}
+@media(max-width:480px){.field-label{min-height:0}form>.primary{margin-top:0}form{grid-template-columns:1fr}h1{font-size:32px}.toolbar{align-items:stretch}.toolbar>button{width:100%}.card{padding:16px}th,td{padding:12px 10px}}
 </style>
 </head>
 <body>
-<header><h1>Promoter explorer</h1><p>Explore candidate responses, promoters, and curated regulatory relationships.</p></header>
+<header>
+<img class="header-art" src="/static/images/prism-header.svg" width="4200" height="2470" alt="PRISM: expression data and regulatory annotations are linked to prioritize candidate promoters for experimental review.">
+<h1>Promoter explorer</h1><p>Promoter Response Index and Selection Map</p>
+<p id="database-context" class="status">Explore candidate responses, promoters, and curated regulatory relationships.</p>
+</header>
 <main>
-<form id="search">
-<label>Gene or candidate<input name="query" placeholder="Search by name, e.g. pdhR"></label>
-<label>Antibiotic class<select name="class"><option value="">All classes</option><option value="beta_lactam">Beta-lactams</option><option value="aminoglycoside">Aminoglycosides</option></select></label>
-<label>Maximum adjusted p-value<input name="padj_max" type="number" min="0" max="1" step="any" placeholder="e.g. 0.05"></label>
-<label>Minimum |log₂ change|<input name="effect_min" type="number" min="0" step="any" placeholder="e.g. 1"></label>
+<form id="search" novalidate>
+<label><span class="field-label">Gene, locus or candidate</span><input name="query" placeholder="e.g. pdhR or b0113"></label>
+<label><span class="field-label">Antibiotic class</span><select name="class"><option value="">All classes</option><option value="beta_lactam">Beta-lactams</option><option value="aminoglycoside">Aminoglycosides</option><option value="cross">Both classes</option></select></label>
+<label><span class="field-label">Support tier</span><select name="support_tier" id="tiers"><option value="">All support tiers</option></select></label>
+<label><span class="field-label">Maximum adjusted p-value</span><input id="padj-max" aria-label="Maximum adjusted p-value" aria-describedby="padj-max-error" name="padj_max" type="number" min="0" max="1" step="any" placeholder="e.g. 0.05"><span id="padj-max-error" class="field-error" hidden></span></label>
+<label><span class="field-label">Minimum |log₂ change|</span><input id="effect-min" aria-label="Minimum absolute log₂ change" aria-describedby="effect-min-error" name="effect_min" type="number" min="0" step="any" placeholder="e.g. 1"><span id="effect-min-error" class="field-error" hidden></span></label>
 <button class="primary" type="submit">Search</button>
 </form>
+<div id="form-errors" class="error" role="alert" hidden></div>
 <div class="toolbar"><div id="status" class="status" role="status" aria-live="polite">Loading database…</div><button id="panel" class="secondary">View selected panel</button></div>
 <div class="layout"><aside><div id="candidates" class="candidate-list" aria-label="Candidates"></div></aside><section id="content"><div class="card empty">Select a candidate to explore its regulatory context.</div></section></div>
 </main>
 <script>
-const $=id=>document.getElementById(id);
-let runId=null, selection=0, searchVersion=0, selected=null;
-const className=value=>({beta_lactam:'Beta-lactam',aminoglycoside:'Aminoglycoside'}[value]||value||'—');
-const number=value=>value==null?'—':Number(value).toPrecision(3);
-function el(tag,text,cls){const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;}
-async function api(path,params={}){const query=new URLSearchParams({...params,...(runId?{run_id:runId}:{})});const r=await fetch(path+'?'+query);const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;}
-function fail(error){$('status').textContent=error.message;$('status').classList.add('error');}
-function table(headers,rows){const wrap=el('div',null,'scroll'),t=el('table'),head=el('thead'),tr=el('tr');headers.forEach(h=>tr.append(el('th',h)));head.append(tr);t.append(head);const b=el('tbody');rows.forEach(row=>{const tr=el('tr');row.forEach(v=>tr.append(el('td',v??'—')));b.append(tr);});t.append(b);wrap.append(t);return wrap;}
-function list(rows){$('candidates').replaceChildren();if(!rows.length){$('candidates').append(el('div','No matching candidates.','empty'));return;}rows.forEach(row=>{const b=el('button',null,'candidate');b.dataset.id=row.candidate_id;b.setAttribute('aria-current',String(row.candidate_id===selected));b.append(el('strong',row.candidate_id),el('span',className(row.antibiotic_class)),el('span',(row.support_tier||row.selection_rationale||'').replaceAll('_',' ')));b.onclick=()=>loadCandidate(row.candidate_id);$('candidates').append(b);});}
-async function search(){const version=++searchVersion;try{const params={};for(const [key,value] of new FormData($('search')))if(value)params[key]=value;const rows=await api('/api/candidates',params);if(version!==searchVersion)return;list(rows);$('status').classList.remove('error');$('status').textContent=rows.length+' matching candidates · discovery comparisons';}catch(e){if(version===searchVersion)fail(e);}}
-$('search').onsubmit=e=>{e.preventDefault();search();};
-$('panel').onclick=async()=>{const version=++searchVersion;try{const rows=await api('/api/panel');if(version!==searchVersion)return;list(rows);$('status').textContent=rows.length+' proposed panel members';}catch(e){fail(e);}};
-async function loadCandidate(id){const version=++selection;selected=id;document.querySelectorAll('.candidate').forEach(b=>b.setAttribute('aria-current',String(b.dataset.id===id)));$('content').replaceChildren(el('div','Loading candidate…','card empty'));try{const [c,graph]=await Promise.all([api('/api/candidate/'+encodeURIComponent(id)),api('/api/network/'+encodeURIComponent(id))]);if(version!==selection)return;renderCandidate(c,graph);}catch(e){if(version===selection){$('content').replaceChildren(el('div',e.message,'card error'));fail(e);}}}
-function renderCandidate(c,graph){const content=$('content');content.replaceChildren();const intro=el('div',null,'card');intro.append(el('h2',c.canonical_name||c.candidate_id));[className(c.antibiotic_class),(c.support_tier||'').replaceAll('_',' '),c.review_status?'Review: '+c.review_status:'Awaiting review'].forEach(t=>intro.append(el('span',t,'tag')));intro.append(el('p',c.promoters.length+' promoters · '+c.transcription_units.length+' transcription units','muted'));content.append(intro);
-const network=el('div',null,'card');network.append(el('h3','Regulatory context'));const legend=el('div',null,'legend');legend.append(el('span','Curated regulation'),el('span','Annotated membership','context'));network.append(legend);const graphBox=el('div',null,'graph'),info=el('div','Select a solid edge to inspect its evidence.','edge-detail');network.append(graphBox,info);content.append(network);drawGraph(graph,graphBox,info);
-const responses=el('div',null,'card');responses.append(el('h3','Measured responses'),el('p','Public-dataset compounds are proxies and cross-reactivity challenges.','muted'));responses.append(table(['Comparison','Role','log₂ change','Adjusted p-value'],c.evidence.map(e=>[e.contrast_id.replace(c.run_id+':',''),e.evidence_role,number(e.effect),number(e.padj)])));content.append(responses);
-const promoters=el('div',null,'card');promoters.append(el('h3','Promoters & sequences'));if(!c.promoters.length)promoters.append(el('p','No promoter mapping available.','muted'));c.promoters.forEach(p=>{const detail=el('details'),summary=el('summary',(p.name||p.promoter_id)+' · '+p.promoter_id);detail.append(summary,el('p','TSS: '+(p.tss??'unknown')+' · Strand: '+(p.strand??'unknown')+' · Sigma: '+(p.sigma_factor||'unknown'),'muted'),el('p',p.sequence||'No annotated sequence available.','sequence'));detail.addEventListener('toggle',async()=>{if(!detail.open||detail.dataset.loaded)return;try{const review=await api('/api/promoter/'+encodeURIComponent(p.promoter_id));detail.dataset.loaded='true';detail.append(el('p',review.review?'Manual review: '+review.review.review_status:'No manual review yet.','muted'));if(review.fragments.length)detail.append(table(['Fragment','Coordinates','Sequence match','Status'],review.fragments.map(f=>[f.fragment_id,(f.start??'?')+'–'+(f.end??'?'),f.sequence_match===1?'Matches':f.sequence_match===0?'Mismatch':'Unknown',f.review_status])));else detail.append(el('p','No proposed construct fragment.','muted'));}catch(e){detail.append(el('p',e.message,'error'));}});promoters.append(detail);});content.append(promoters);
+const $ = id => document.getElementById(id);
+let runId = null,
+  selection = 0,
+  searchVersion = 0,
+  selected = null;
+const className = value => ({
+  beta_lactam: 'Beta-lactam',
+  aminoglycoside: 'Aminoglycoside',
+  cross: 'Both classes'
+} [value] || value || '—');
+const number = value => value == null || value === '' || !Number.isFinite(Number(value))
+  ? '—' : Number(value).toPrecision(3);
+const conditionName = value => value.replace(/^benchmark_/, '');
+
+function el(tag, text, cls) {
+  const n = document.createElement(tag);
+  if (text != null) n.textContent = text;
+  if (cls) n.className = cls;
+  return n;
 }
-function drawGraph(graph,box,info){const NS='http://www.w3.org/2000/svg',groups=['actor','promoter','tu','gene'],labels=['Regulators','Promoters','Transcription units','Candidate gene'],colors=['#e4dff6','#cbe6dd','#fff0c8','#dde7fc'];const columns=groups.map(kind=>graph.nodes.filter(n=>n.kind===kind));const height=Math.max(220,...columns.map(col=>col.length*70+90));const svg=document.createElementNS(NS,'svg');svg.setAttribute('viewBox','0 0 940 '+height);svg.setAttribute('role','img');svg.setAttribute('aria-label','Candidate regulatory network');box.append(svg);function s(tag,attributes={},text){const n=document.createElementNS(NS,tag);Object.entries(attributes).forEach(([k,v])=>n.setAttribute(k,v));if(text)n.textContent=text;return n;}
-const defs=s('defs');[['arrow','M0,0 L8,4 L0,8 Z'],['bar','M5,0 L5,8']].forEach(([id,d])=>{const marker=s('marker',{id,viewBox:'0 0 8 8',refX:7,refY:4,markerWidth:8,markerHeight:8,orient:'auto'});marker.append(s('path',{d,fill:id==='bar'?'none':'#495371',stroke:'#495371','stroke-width':1.5}));defs.append(marker);});svg.append(defs);const pos={};columns.forEach((col,i)=>{svg.append(s('text',{x:28+i*235,y:28,fill:'#606477','font-size':12},labels[i]));col.forEach((n,j)=>pos[n.id]={x:28+i*235,y:55+j*70});});
-graph.edges.forEach((e,index)=>{const a=pos[e.source],b=pos[e.target];if(!a||!b)return;const x1=a.x+168,y1=a.y+19,x2=b.x,y2=b.y+19;const direct=e.kind==='regulation',curve=(index%5-2)*5;const line=s('path',{d:`M${x1},${y1} C${x1+55},${y1+curve} ${x2-55},${y2+curve} ${x2},${y2}`,fill:'none',stroke:direct?'#495371':'#a4a9b5','stroke-width':direct?2:1.5,...(direct?{'marker-end':e.effect==='repressor'?'url(#bar)':'url(#arrow)'}:{'stroke-dasharray':'5 5'})});line.append(s('title',{},direct?[e.effect,e.confidence,e.evidence].filter(Boolean).join(' · '):e.label));if(direct){line.style.cursor='pointer';line.onclick=()=>{info.replaceChildren();[['Effect',e.effect],['Target type',e.target_kind],['Confidence',e.confidence],['Conformation',e.conformation],['Interaction evidence',e.evidence],['Binding-site evidence',e.site_evidence],['Binding site',e.site_id],['Publication IDs',e.pmids],['Reference release',e.source_release]].forEach(([label,value])=>{const p=el('div');p.append(el('strong',label+': '),document.createTextNode(value||'Unspecified'));info.append(p);});};}svg.append(line);});
-columns.forEach((col,i)=>col.forEach(n=>{const p=pos[n.id],g=s('g');g.append(s('rect',{x:p.x,y:p.y,width:168,height:38,rx:8,fill:colors[i],stroke:'#d4d7dd'}),s('text',{x:p.x+10,y:p.y+24,'font-size':12,fill:'#24283d'},n.label.length>21?n.label.slice(0,20)+'…':n.label),s('title',{},n.entity_id));svg.append(g);}));if(!graph.edges.length)info.textContent='No curated regulatory interactions are linked to this candidate.';
+async function api(path, params = {}) {
+  const query = new URLSearchParams({
+    ...params,
+    ...(runId ? {
+      run_id: runId
+    } : {})
+  });
+  let r;
+  try { r = await fetch(path + '?' + query); }
+  catch { throw new Error('Could not connect to the explorer. Check that the local server is running, then try again.'); }
+  let data;
+  try { data = await r.json(); }
+  catch { throw new Error('The explorer returned an unreadable response. Please try again.'); }
+  if (!r.ok) throw new Error(data.error || 'The request could not be completed. Please try again.');
+  return data;
 }
-async function init(){try{const runs=await api('/api/runs');const latest=runs.find(r=>r.status==='complete');if(!latest)throw new Error('No completed analysis run available.');runId=latest.run_id;const coverage=await api('/api/coverage');document.querySelector('header p').textContent='RegulonDB '+latest.reference_release+' · '+(coverage.regulatory_interactions??'—')+' curated interactions · '+(coverage.interactions_without_promoter??'—')+' without a promoter link';await search();}catch(e){fail(e);}}
+
+function fail(error) {
+  $('status').textContent = error.message;
+  $('status').classList.add('error');
+}
+
+function table(headers, rows) {
+  const wrap = el('div', null, 'scroll'),
+    t = el('table'),
+    head = el('thead'),
+    tr = el('tr');
+  headers.forEach(h => tr.append(el('th', h)));
+  head.append(tr);
+  t.append(head);
+  const b = el('tbody');
+  rows.forEach(row => {
+    const tr = el('tr');
+    row.forEach(v => tr.append(el('td', v ?? '—')));
+    b.append(tr);
+  });
+  t.append(b);
+  wrap.append(t);
+  return wrap;
+}
+
+function list(rows) {
+  $('candidates').replaceChildren();
+  if (!rows.length) {
+    $('candidates').append(el('div', 'No matching candidates.', 'empty'));
+    return;
+  }
+  rows.forEach(row => {
+    const b = el('button', null, 'candidate');
+    b.dataset.id = row.candidate_id;
+    b.dataset.class = row.antibiotic_class;
+    b.setAttribute('aria-current', String(row.candidate_id === selected));
+    const note = row.support_tier || (row.selection_order != null ? 'Panel selection #' + row.selection_order : '');
+    b.append(el('strong', row.candidate_id), el('span', className(row.antibiotic_class)),
+      el('span', note.replaceAll('_', ' ')));
+    b.onclick = () => loadCandidate(row.candidate_id);
+    $('candidates').append(b);
+  });
+}
+const numericFilters = [
+  {id: 'padj-max', max: 1, message: 'Enter a number from 0 to 1, such as 0.05, or leave this blank.'},
+  {id: 'effect-min', max: Infinity, message: 'Enter a finite number of 0 or greater, such as 1, or leave this blank.'}
+];
+function validateField(rule) {
+  const field = $(rule.id), message = $(rule.id + '-error');
+  const value = field.value.trim();
+  const invalid = field.validity.badInput || (value !== '' &&
+    (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > rule.max));
+  field.setAttribute('aria-invalid', String(invalid));
+  message.textContent = invalid ? rule.message : '';
+  message.hidden = !invalid;
+  return !invalid;
+}
+function validateFilters(focus = false) {
+  const invalid = numericFilters.filter(rule => !validateField(rule));
+  $('form-errors').hidden = invalid.length === 0;
+  $('form-errors').textContent = invalid.length
+    ? 'Search not updated. Correct the highlighted ' + (invalid.length === 1 ? 'field' : 'fields') + ' and search again.' : '';
+  if (focus && invalid.length) $(invalid[0].id).focus();
+  return invalid.length === 0;
+}
+numericFilters.forEach(rule => {
+  $(rule.id).addEventListener('blur', () => validateField(rule));
+  $(rule.id).addEventListener('input', () => {
+    if ($(rule.id).getAttribute('aria-invalid') === 'true' || !$('form-errors').hidden)
+      validateFilters();
+  });
+});
+async function search() {
+  if (!validateFilters(true)) { ++searchVersion; return; }
+  const version = ++searchVersion;
+  try {
+    const params = {};
+    for (const [key, value] of new FormData($('search')))
+      if (value.trim()) params[key] = value.trim();
+    const rows = await api('/api/candidates', params);
+    if (version !== searchVersion) return;
+    if ($('tiers').options.length === 1) {
+      [...new Set(rows.map(r => r.support_tier).filter(Boolean))].sort().forEach(t => {
+        const option = el('option', t.replaceAll('_', ' '));
+        option.value = t;
+        $('tiers').append(option);
+      });
+    }
+    list(rows);
+    $('status').classList.remove('error');
+    $('status').textContent = rows.length + ' matching candidates · discovery comparisons';
+  } catch (e) {
+    if (version === searchVersion) fail(e);
+  }
+}
+$('search').onsubmit = e => {
+  e.preventDefault();
+  search();
+};
+$('panel').onclick = async () => {
+  const version = ++searchVersion;
+  try {
+    const rows = await api('/api/panel');
+    if (version !== searchVersion) return;
+    list(rows);
+    $('status').classList.remove('error');
+    $('status').textContent = rows.length + ' proposed panel members';
+  } catch (e) {
+    fail(e);
+  }
+};
+async function loadCandidate(id) {
+  const version = ++selection;
+  selected = id;
+  document.querySelectorAll('.candidate').forEach(b => b.setAttribute('aria-current', String(b.dataset
+    .id === id)));
+  $('content').replaceChildren(el('div', 'Loading candidate…', 'card empty'));
+  try {
+    const [c, graph] = await Promise.all([api('/api/candidate/' + encodeURIComponent(id)), api(
+      '/api/network/' + encodeURIComponent(id))]);
+    if (version !== selection) return;
+    renderCandidate(c, graph);
+  } catch (e) {
+    if (version === selection) {
+      $('content').replaceChildren(el('div', e.message, 'card error'));
+      fail(e);
+    }
+  }
+}
+
+function renderCandidate(c, graph) {
+  const content = $('content');
+  content.replaceChildren();
+  const intro = el('div', null, 'card');
+  intro.append(el('h2', c.canonical_name || c.candidate_id));
+  [className(c.antibiotic_class), (c.support_tier || '').replaceAll('_', ' '), c.review_status ? 'Review: ' +
+    c.review_status : 'Awaiting review'
+  ].forEach((t, index) => {
+    const tag = el('span', t, 'tag');
+    if (index === 0) tag.dataset.class = c.antibiotic_class;
+    intro.append(tag);
+  });
+  intro.append(el('p', c.promoters.length + ' promoters · ' + c.transcription_units.length +
+    ' transcription units', 'muted'));
+  const identifiers = [...new Set((c.identifiers || []).filter(i => i.namespace !== 'gene_symbol').map(i => i.identifier))];
+  if (identifiers.length) intro.append(el('p', 'Source identifiers: ' + identifiers.join(', '), 'muted'));
+  content.append(intro);
+  const network = el('div', null, 'card');
+  network.append(el('h3', 'Regulatory context'));
+  const legend = el('div', null, 'legend');
+  legend.append(el('span', 'Curated regulation'), el('span', 'Annotated membership', 'context'));
+  network.append(legend);
+  const graphBox = el('div', null, 'graph'),
+    info = el('div', 'Select a solid edge to inspect its evidence.', 'edge-detail');
+  network.append(graphBox, info);
+  content.append(network);
+  drawGraph(graph, graphBox, info);
+  const responses = el('div', null, 'card');
+  responses.append(el('h3', 'Measured responses'), el('p',
+    'Public-dataset compounds are proxies and cross-reactivity challenges.', 'muted'));
+  responses.append(table(['Comparison', 'Measured gene', 'Role', 'log₂ change', 'Adjusted p-value'], c
+    .evidence.map(e => [e.contrast_id.replace(c.run_id + ':', ''), e.source_gene_id, (e.evidence_role ||
+      '').replaceAll('_', ' '), number(e.effect), number(e.padj)])));
+  content.append(responses);
+  if (c.experimental_context?.length) {
+    const context = el('details', null, 'card');
+    context.append(el('summary', 'Source-study growth and exposure conditions'));
+    context.append(el('p', 'Literature-curated context. Unknown concentrations and exposure times remain unknown; these are not reporter measurements.', 'muted'));
+    context.append(table(['Condition', 'Medium', 'Growth phase', 'Dose basis', 'Concentration', 'Exposure (min)'],
+      c.experimental_context.map(row => [conditionName(row.condition), row.medium || 'unknown',
+        row.growth_phase || 'unknown', row.concentration_basis || 'unknown',
+        row.concentration == null ? 'unknown' : number(row.concentration) + ' ' + row.concentration_unit,
+        row.exposure_minutes == null ? 'unknown' : number(row.exposure_minutes)])));
+    [...new Set(c.experimental_context.map(row => row.source_reference).filter(Boolean))].forEach(source => context.append(el('p', 'Source: ' + source, 'muted')));
+    content.append(context);
+  }
+  if (c.assessments?.length || c.replicates?.length) {
+    const assessment = el('details', null, 'card');
+    assessment.append(el('summary', 'Stability, cross-reactivity & replicates'));
+    assessment.append(el('p', 'Post-fit screens describe ranking stability; cross-reactivity intervals are not equivalence tests. Replicate values are normalized RNA counts.', 'muted'));
+    const stability = c.assessments.filter(row => row.assessment_type === 'stability').map(row => row.metrics);
+    if (stability.length) assessment.append(table(['Class', 'Screens selected', 'Screens tested'],
+      stability.map(row => [className(row.antibiotic_class), row.n_screens_selected, row.n_screens])));
+    const cross = c.assessments.filter(row => row.assessment_type === 'cross_reactivity').map(row => row.metrics);
+    if (cross.length) assessment.append(table(['Comparison', 'Direct result', 'Family adjusted p-value'],
+      cross.map(row => [conditionName(row.discovery_dataset) + ' vs ' + conditionName(row.counterpart_dataset),
+        row.direct_status.replaceAll('_', ' '), number(row.family_padj)])));
+    if (c.replicates.length) assessment.append(table(['Comparison', 'Gene', 'Condition', 'Replicates', 'Mean', 'CV'],
+      c.replicates.map(row => [row.contrast_id.replace(c.run_id + ':', ''),
+        JSON.parse(row.metrics_json).gene_id, conditionName(row.condition), row.replicate_count,
+        number(row.mean_value), number(row.coefficient_of_variation)])));
+    content.append(assessment);
+  }
+  const promoters = el('div', null, 'card');
+  promoters.append(el('h3', 'Promoters & sequences'));
+  if (!c.promoters.length) promoters.append(el('p', 'No promoter mapping available.', 'muted'));
+  c.promoters.forEach(p => {
+    const detail = el('details'),
+      summary = el('summary', (p.name || p.promoter_id) + ' · ' + p.promoter_id);
+    detail.append(summary, el('p', 'TSS: ' + (p.tss ?? 'unknown') + ' · Strand: ' + (p.strand ??
+      'unknown') + ' · Sigma: ' + (p.sigma_factor || 'unknown'), 'muted'), el('p', p.sequence ||
+      'No annotated sequence available.', 'sequence'));
+    detail.addEventListener('toggle', async () => {
+      if (!detail.open || detail.dataset.loaded) return;
+      try {
+        const review = await api('/api/promoter/' + encodeURIComponent(p.promoter_id));
+        detail.dataset.loaded = 'true';
+        detail.append(el('p', review.review ? 'Manual review: ' + review.review.review_status :
+          'No manual review yet.', 'muted'));
+        if (review.fragments.length) detail.append(table(['Fragment', 'Coordinates',
+          'Sequence match', 'Status'
+        ], review.fragments.map(f => [f.fragment_id, (f.start ?? '?') + '–' + (f.end ?? '?'),
+          f.sequence_match === 1 ? 'Matches' : f.sequence_match === 0 ? 'Mismatch' :
+          'Unknown', f.review_status
+        ])));
+        else detail.append(el('p', 'No proposed construct fragment.', 'muted'));
+      } catch (e) {
+        detail.append(el('p', e.message, 'error'));
+      }
+    });
+    promoters.append(detail);
+  });
+  content.append(promoters);
+}
+
+function drawGraph(graph, box, info) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const groups = ['actor', 'promoter', 'tu', 'gene'];
+  const labels = ['Regulators', 'Promoters', 'Transcription units', 'Candidate gene'];
+  const colors = ['var(--cornflower)', 'var(--fluorescence)', 'var(--lime)', 'var(--orchid)'];
+  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+  const connections = new Map();
+
+  // Bundle only identical endpoints. Individual effects and evidence stay intact.
+  graph.edges.forEach(edge => {
+    const key = JSON.stringify([edge.source, edge.target, edge.kind]);
+    if (!connections.has(key)) connections.set(key, { ...edge, records: [] });
+    connections.get(key).records.push(edge);
+  });
+  const edges = [...connections.values()];
+  const actors = graph.nodes.filter(node => node.kind === 'actor');
+  const controls = el('div', null, 'toolbar');
+  const label = el('label', 'Regulator');
+  const focus = el('select');
+  const overview = el('option', 'All regulators');
+  overview.value = '';
+  focus.append(overview);
+  actors.forEach(actor => {
+    const option = el('option', actor.label);
+    option.value = actor.id;
+    focus.append(option);
+  });
+  focus.value = actors[0]?.id || '';
+  label.append(focus);
+  const count = el('span', null, 'muted');
+  controls.append(label, count);
+  box.before(controls);
+
+  function s(tag, attributes = {}, text) {
+    const element = document.createElementNS(NS, tag);
+    Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+    if (text) element.textContent = text;
+    return element;
+  }
+
+  function showEvidence(connection) {
+    info.replaceChildren();
+    info.append(el('strong', nodes.get(connection.source).label + ' → ' +
+      nodes.get(connection.target).label));
+    const label = el('label', 'Interaction record');
+    const select = el('select');
+    connection.records.forEach((record, index) => {
+      const option = el('option', record.id + ' · ' + (record.effect || 'unspecified effect'));
+      option.value = index;
+      select.append(option);
+    });
+    label.append(select);
+    const detail = el('div');
+    info.append(label, detail);
+    function update() {
+      const record = connection.records[Number(select.value)];
+      detail.replaceChildren();
+      [
+        ['Effect', record.effect], ['Target type', record.target_kind],
+        ['Confidence', record.confidence], ['Conformation', record.conformation],
+        ['Interaction evidence', record.evidence], ['Binding-site evidence', record.site_evidence],
+        ['Binding site', record.site_id], ['Publication IDs', record.pmids],
+        ['Reference release', record.source_release]
+      ].forEach(([name, value]) => {
+        const row = el('div');
+        row.append(el('strong', name + ': '), document.createTextNode(value || 'Unspecified'));
+        detail.append(row);
+      });
+    }
+    select.onchange = update;
+    update();
+  }
+
+  function render() {
+    const direct = edges.filter(edge => edge.kind === 'regulation' &&
+      (!focus.value || edge.source === focus.value));
+    const visible = new Set(direct.flatMap(edge => [edge.source, edge.target]));
+    if (!focus.value) graph.nodes.forEach(node => visible.add(node.id));
+    // Follow membership downstream from the actual target, without inventing regulation.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      edges.filter(edge => edge.kind === 'context').forEach(edge => {
+        if (visible.has(edge.source) && !visible.has(edge.target)) {
+          visible.add(edge.target);
+          changed = true;
+        }
+      });
+    }
+    const context = edges.filter(edge => edge.kind === 'context' &&
+      visible.has(edge.source) && visible.has(edge.target));
+    const shown = [...direct, ...context];
+    const columns = groups.map(kind => graph.nodes.filter(node => node.kind === kind && visible.has(node.id)));
+    const longEdges = shown.filter(edge =>
+      groups.indexOf(nodes.get(edge.target).kind) - groups.indexOf(nodes.get(edge.source).kind) > 1);
+    const top = 65 + longEdges.length * 18;
+    const bodyHeight = Math.max(150, ...columns.map(column => column.length * 72));
+    const height = top + bodyHeight + 30;
+    const svg = s('svg', { viewBox: '0 0 1040 ' + height, role: 'img',
+      'aria-label': 'Candidate regulatory network' });
+    box.replaceChildren(svg);
+    count.textContent = direct.length + ' connections · ' +
+      direct.reduce((sum, edge) => sum + edge.records.length, 0) + ' reference records';
+    info.replaceChildren(el('span', direct.length ?
+      'Select a solid connection to inspect its reference records.' :
+      'No curated regulatory interactions are linked to this candidate.'));
+
+    const defs = s('defs');
+    [['arrow', 'M0,0 L8,4 L0,8 Z'], ['bar', 'M5,0 L5,8']].forEach(([id, d]) => {
+      const marker = s('marker', { id, viewBox: '0 0 8 8', refX: 7, refY: 4,
+        markerWidth: 8, markerHeight: 8, markerUnits: 'userSpaceOnUse', orient: 'auto' });
+      marker.append(s('path', { d, fill: id === 'bar' ? 'none' : 'var(--periwinkle)',
+        stroke: 'var(--periwinkle)', 'stroke-width': 1.3 }));
+      defs.append(marker);
+    });
+    svg.append(defs);
+    const pos = {};
+    columns.forEach((column, index) => {
+      svg.append(s('text', { x: 24 + index * 260, y: 25, fill: 'var(--periwinkle)', 'font-size': 16, 'font-family': 'Geist', 'font-weight': 700 }, labels[index]));
+      column.forEach((node, row) => {
+        pos[node.id] = { x: 24 + index * 260,
+          y: top + (bodyHeight - column.length * 72) / 2 + row * 72 + 15 };
+      });
+    });
+    const outgoing = new Map(), incoming = new Map();
+    shown.forEach(edge => {
+      if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
+      if (!incoming.has(edge.target)) incoming.set(edge.target, []);
+      outgoing.get(edge.source).push(edge);
+      incoming.get(edge.target).push(edge);
+    });
+    const port = (map, id, edge) => {
+      const list = map.get(id);
+      return 8 + 26 * (list.indexOf(edge) + 1) / (list.length + 1);
+    };
+    shown.forEach(edge => {
+      const a = pos[edge.source], b = pos[edge.target];
+      const x1 = a.x + 178, y1 = a.y + port(outgoing, edge.source, edge);
+      const x2 = b.x, y2 = b.y + port(incoming, edge.target, edge);
+      const isDirect = edge.kind === 'regulation';
+      const longIndex = longEdges.indexOf(edge);
+      // Orthogonal routes stay in the gaps; routes skipping a column pass above the boxes.
+      const gap = outgoing.get(edge.source);
+      const lane = x1 + 20 + 38 * (gap.indexOf(edge) + 1) / (gap.length + 1);
+      const route = longIndex >= 0 ?
+        `M${x1},${y1} H${lane} V${43 + longIndex * 18} H${x2 + 89} V${b.y - 3}` :
+        `M${x1},${y1} H${lane} V${y2} H${x2 - 3}`;
+      const effects = new Set(edge.records.map(record => record.effect));
+      const line = s('path', { d: route, fill: 'none', stroke: isDirect ? 'var(--periwinkle)' : 'var(--northern)',
+        'stroke-width': 1.5, ...(isDirect ?
+          { 'marker-end': effects.size === 1 && effects.has('repressor') ? 'url(#bar)' : 'url(#arrow)' } :
+          { 'stroke-dasharray': '5 5' }) });
+      const description = isDirect ? nodes.get(edge.source).label + ' → ' +
+        nodes.get(edge.target).label + ': ' + edge.records.length + ' reference records' : edge.label;
+      line.append(s('title', {}, description));
+      if (isDirect) {
+        line.style.cursor = 'pointer';
+        line.setAttribute('tabindex', '0');
+        line.setAttribute('role', 'button');
+        line.setAttribute('aria-label', 'Inspect ' + description);
+        line.onclick = () => showEvidence(edge);
+        line.onkeydown = event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            showEvidence(edge);
+          }
+        };
+      }
+      svg.append(line);
+    });
+    columns.forEach((column, index) => column.forEach(node => {
+      const point = pos[node.id], group = s('g');
+      group.append(s('rect', { x: point.x, y: point.y, width: 178, height: 42,
+        fill: 'var(--ebony)', stroke: colors[index], 'stroke-width': 1.5 }),
+        s('text', { x: point.x + 10, y: point.y + 26, 'font-size': 16, fill: 'var(--periwinkle)' },
+          node.label.length > 23 ? node.label.slice(0, 22) + '…' : node.label),
+        s('title', {}, node.entity_id));
+      svg.append(group);
+    }));
+  }
+  focus.onchange = render;
+  render();
+}
+async function init() {
+  try {
+    const runs = await api('/api/runs');
+    const latest = runs.find(r => r.status === 'complete');
+    if (!latest) throw new Error('No completed analysis run available.');
+    runId = latest.run_id;
+    const coverage = await api('/api/coverage');
+    $('database-context').textContent = latest.run_id.startsWith('demo-')
+      ? 'Fictional software example · No experimental measurements or biological claims'
+      : 'RegulonDB ' + latest.reference_release + ' · ' + (
+      coverage.regulatory_interactions ?? '—') + ' curated interactions';
+    await search();
+  } catch (e) {
+    fail(e);
+  }
+}
 init();
 </script>
 </body>

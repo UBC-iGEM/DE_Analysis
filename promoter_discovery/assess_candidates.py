@@ -370,6 +370,11 @@ def main(argv=None):
                "panel_selection": "Greedy review proposal; equal class quotas; no repeated promoter or connected TU group; not an optimized or validated biosensor panel",
                "limitations": "Class proxies, three replicates per condition, shared controls. Expression is not reporter fluorescence; CI bounds are descriptive, not equivalence tests. Fragments require manual review."}
     (out / "analysis_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    # Only the standard layout is consumed by the database/evaluation adapters.
+    if out.resolve() == (root / "results/candidate_assessment").resolve():
+        from .evaluate_selection import evaluate
+
+        evaluate(root.resolve(), args.panel_per_class)
     if not args.skip_database:
         from .build_database import build_database
 

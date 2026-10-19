@@ -108,7 +108,6 @@ def load_dataset_config(path: str | Path) -> dict[str, Any]:
                 f"Dataset {name} has unsupported antibiotic_class "
                 f"{dataset['antibiotic_class']!r}; expected {sorted(CLASS_REGISTRY)}"
             )
-    config["_path"] = str(config_path.resolve())
     return config
 
 

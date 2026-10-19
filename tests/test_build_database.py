@@ -1,5 +1,6 @@
 import sqlite3
 import pickle
+import csv
 
 import pytest
 
@@ -18,7 +19,7 @@ def test_build_database_links_all_fixture_evidence(database_root, tmp_path):
                       "candidate_promoters", "candidate_panels")
     }
     assert counts == {
-        "assets": 20, "contrasts": 3, "de_results": 6, "candidates": 1,
+        "assets": 25, "contrasts": 3, "de_results": 6, "candidates": 1,
         "candidate_evidence": 3, "regulatory_edges": 1, "regulatory_interactions": 2,
         "transcription_units": 2, "tu_genes": 3, "candidate_tus": 1, "candidate_promoters": 1,
         "candidate_panels": 1,
@@ -87,3 +88,28 @@ def test_missing_graph_is_an_error_not_an_empty_network(database_root, tmp_path)
     (database_root / "results/regulatory_network/regulatory_network.pkl").unlink()
     with pytest.raises(FileNotFoundError, match="regulatory_network.pkl"):
         build_database(database_root, tmp_path / "project.sqlite")
+
+
+def test_missing_fragment_coordinates_are_unknown_not_sequence_mismatches(database_root, tmp_path):
+    path = database_root / 'results/candidate_assessment/fragment_review.csv'
+    with path.open(newline='') as handle:
+        rows = list(csv.DictReader(handle))
+    rows[0].update(fragment_start='', fragment_end='', reference_sequence_matches='False')
+    with path.open('w', newline='') as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0])
+        writer.writeheader()
+        writer.writerows(rows)
+    with Database(build_database(database_root, tmp_path / 'project.sqlite')) as database:
+        fragment = database.get_promoter('P1')['fragments'][0]
+        assert fragment['sequence_match'] is None
+        assert fragment['missing_coordinates'] == 1
+
+
+def test_importer_release_changes_run_identity(database_root, tmp_path, monkeypatch):
+    from promoter_discovery import build_database as importer
+    path = tmp_path / 'project.sqlite'
+    with Database(build_database(database_root, path)) as database:
+        first = database.runs()[0]['run_id']
+    monkeypatch.setattr(importer, '__version__', 'next-release')
+    with Database(build_database(database_root, path)) as database:
+        assert database.runs()[0]['run_id'] != first
