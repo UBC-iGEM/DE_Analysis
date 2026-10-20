@@ -265,11 +265,3 @@ run against cached, locked references is an additional release check. The future
 screening layer can link construct/version → plate/well → exposure/replicate →
 measurement to existing candidate and promoter IDs; this experimental layer is
 not implemented yet.
-
-## Data terms
-
-RegulonDB data, the GEO source archive, PRECISE-1K, and the GenBank genome retain
-their providers' terms; see
-`config/*assets.json` and the [data inventory](data/README.md). Review those terms
-before distributing a populated database. The fictional demo avoids redistribution
-of reference records.
