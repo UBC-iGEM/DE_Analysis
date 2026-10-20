@@ -1,3 +1,5 @@
+"""Verify the reproducible joint differential-expression benchmark workflow."""
+
 import json
 import math
 from pathlib import Path

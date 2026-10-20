@@ -1,3 +1,5 @@
+"""Verify PRISM search, lookup, and scientific-record write protection."""
+
 import sqlite3
 
 import pytest
@@ -40,6 +42,26 @@ def test_read_only_queries_leave_database_unchanged_and_reject_writes(database_r
             with pytest.raises(ValueError, match="effect_min"):
                 database.search_candidates(effect_min=value)
     assert path.read_bytes() == before
+
+
+def test_writable_api_only_allows_versioned_curation(database_root, tmp_path):
+    path = build_database(database_root, tmp_path / "project.sqlite")
+    with Database(path) as database:
+        run_id = database.runs()[0]["run_id"]
+        with pytest.raises(sqlite3.DatabaseError):
+            database.connection.execute("UPDATE candidates SET ranking_score=0")
+        edit_id = database.record_candidate_review(
+            run_id,
+            "genea",
+            "reviewed",
+            "team reviewer",
+            "checked against the imported evidence",
+        )
+        assert edit_id.startswith("edit-")
+        with pytest.raises(sqlite3.DatabaseError):
+            database.connection.execute("UPDATE candidate_reviews SET notes='changed'")
+        with pytest.raises(sqlite3.DatabaseError):
+            database.connection.execute("DELETE FROM curation_edits")
 
 
 def test_targets_are_separate_from_observed_class_proxies(database_root, tmp_path):

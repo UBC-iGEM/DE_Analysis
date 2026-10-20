@@ -161,7 +161,16 @@ def build_condition_groups(ica: IcaData) -> dict[str, dict[str, Any]]:
         for sample_id, condition in conditions.items():
             condition_lower = condition.lower()
             tokens = condition_lower.split("_")
-            drug = next((token for token in tokens if any(keyword in token for keyword in keywords)), None)
+            drug = None
+            for token in tokens:
+                matches_keyword = False
+                for keyword in keywords:
+                    if keyword in token:
+                        matches_keyword = True
+                        break
+                if matches_keyword:
+                    drug = token
+                    break
             if not drug:
                 continue
             background = condition_lower.replace(f"_{drug}", "").strip("_") or tokens[0]
@@ -177,7 +186,9 @@ def build_condition_groups(ica: IcaData) -> dict[str, dict[str, Any]]:
             control = sorted(set(slot["control"]))
             result[class_key]["treated"].extend(treated)
             result[class_key]["control"].extend(control)
-            result[class_key]["pairs"].extend((treated_id, control_id) for treated_id in treated for control_id in control)
+            for treated_id in treated:
+                for control_id in control:
+                    result[class_key]["pairs"].append((treated_id, control_id))
             result[class_key]["backgrounds"].append({"background": background, "treated": treated, "control": control})
     return result
 

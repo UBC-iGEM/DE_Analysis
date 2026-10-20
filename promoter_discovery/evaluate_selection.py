@@ -48,12 +48,20 @@ def panel_metrics(panel: pd.DataFrame) -> dict:
         "selected_slots": len(panel), "unique_genes": int(panel.gene.nunique()),
         "unique_promoters": int(panel.promoter_id.nunique()),
         "unique_tu_groups": int(panel.transcription_group.nunique()),
-        "class_counts": {cls: int(panel.antibiotic_class.eq(cls).sum()) for cls in CLASSES},
+        "class_counts": class_counts(panel),
         "median_shrunk_log2_effect": median("shrunk_effect"),
         "median_screen_fraction": median("screen_fraction"),
         "median_max_counterpart_abs_log2_effect": median("challenge_max_abs_log2FC"),
         "missing_counterpart_effects": int(panel.challenge_max_abs_log2FC.isna().sum()),
     }
+
+
+def class_counts(panel: pd.DataFrame) -> dict:
+    """Count selected rows for each supported antibiotic class."""
+    counts = {}
+    for antibiotic_class in CLASSES:
+        counts[antibiotic_class] = int(panel.antibiotic_class.eq(antibiotic_class).sum())
+    return counts
 
 
 def compare_selection(options: pd.DataFrame, panel: pd.DataFrame, per_class: int) -> tuple[dict, pd.DataFrame]:
@@ -109,12 +117,18 @@ def evaluate(root: Path, per_class: int = 6) -> dict:
         "panel": assessment / "experimental_panel.csv",
         "tus": root / "data/references/regulondb/TUSet.tsv",
     }
-    frames = {key: pd.read_csv(path) for key, path in files.items() if key != "tus"}
+    frames = {}
+    for key, path in files.items():
+        if key != "tus":
+            frames[key] = pd.read_csv(path)
     options = panel_options(*(frames[key] for key in ("stability", "candidates", "mapped", "fragments", "reactivity", "replicates")),
                             transcription_groups(read_product(files["tus"])))
     report, baseline = compare_selection(options, frames["panel"], per_class)
-    report["input_sha256"] = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                              for path in files.values()}
+    input_hashes = {}
+    for path in files.values():
+        relative_path = path.relative_to(root).as_posix()
+        input_hashes[relative_path] = hashlib.sha256(path.read_bytes()).hexdigest()
+    report["input_sha256"] = input_hashes
     report["code_sha256"] = source_provenance()["code_sha256"]
     baseline.to_csv(assessment / "selection_baseline.csv", index=False)
     (assessment / "selection_comparison.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")

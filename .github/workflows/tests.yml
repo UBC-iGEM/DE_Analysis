@@ -1,3 +1,4 @@
+# Run the repository test suite for proposed and merged changes.
 name: Tests
 
 on:

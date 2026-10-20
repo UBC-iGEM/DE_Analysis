@@ -1,3 +1,5 @@
+"""Verify command-line searches, JSON output, and review commands."""
+
 from promoter_discovery.build_database import build_database
 from promoter_discovery.db_cli import main
 

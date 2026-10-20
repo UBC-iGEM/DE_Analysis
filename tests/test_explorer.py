@@ -1,3 +1,5 @@
+"""Verify local explorer routes, validation, and static assets."""
+
 import pytest
 
 from promoter_discovery.build_database import build_database

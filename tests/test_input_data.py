@@ -1,3 +1,5 @@
+"""Verify count loading, sample validation, and differential-expression inputs."""
+
 import numpy as np
 import pandas as pd
 import pytest

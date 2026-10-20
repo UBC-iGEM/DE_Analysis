@@ -24,7 +24,12 @@ def archive_path(database_path: str | Path) -> Path:
 
 
 def attach_archive(connection: sqlite3.Connection, path: Path) -> None:
-    if "curation_archive" not in {row[1] for row in connection.execute("PRAGMA database_list")}:
+    attached = False
+    for row in connection.execute("PRAGMA database_list"):
+        if row[1] == "curation_archive":
+            attached = True
+            break
+    if not attached:
         connection.execute("ATTACH DATABASE ? AS curation_archive", (str(path),))
         connection.execute(ARCHIVE_SCHEMA.replace("review_history", "curation_archive.review_history", 1))
 
@@ -47,10 +52,14 @@ def preserve_existing_reviews(database_path: Path) -> None:
     old = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)
     old.row_factory = sqlite3.Row
     try:
-        tables = {row[0] for row in old.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        tables = set()
+        for row in old.execute("SELECT name FROM sqlite_master WHERE type='table'"):
+            tables.add(row[0])
         if "curation_edits" not in tables:
             return
-        edits = [dict(row) for row in old.execute("SELECT * FROM curation_edits")]
+        edits = []
+        for row in old.execute("SELECT * FROM curation_edits"):
+            edits.append(dict(row))
         if not edits:
             return
         with sqlite3.connect(archive_path(database_path)) as archive:
@@ -98,5 +107,10 @@ def review_history(path: Path, entity_type: str, entity_id: str) -> list[dict]:
             "SELECT edit_json, review_json, reference_release FROM review_history "
             "WHERE entity_type=? AND entity_id=? ORDER BY edited_at, edit_id", (entity_type, entity_id)
         ).fetchall()
-    return [{**json.loads(edit), "review": json.loads(review), "reference_release": release}
-            for edit, review, release in rows]
+    history = []
+    for edit_json, review_json, release in rows:
+        edit = json.loads(edit_json)
+        edit["review"] = json.loads(review_json)
+        edit["reference_release"] = release
+        history.append(edit)
+    return history

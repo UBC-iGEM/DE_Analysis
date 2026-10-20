@@ -54,11 +54,17 @@ def insert_sample_metadata(connection, root: Path, run_id: str, config: dict) ->
         if "sample_id" not in row and "" in row:
             row["sample_id"] = row.pop("")
     qc = read_rows(root / "results/candidate_assessment/sample_qc.csv")
-    by_sample = {row["sample_id"]: row for row in metadata}
-    qc_ids = [row["sample_id"] for row in qc]
+    by_sample = {}
+    for row in metadata:
+        by_sample[row["sample_id"]] = row
+    qc_ids = []
+    for row in qc:
+        qc_ids.append(row["sample_id"])
     if len(by_sample) != len(metadata) or len(set(qc_ids)) != len(qc_ids) or set(qc_ids) != set(by_sample):
         raise ValueError("Sample metadata and QC must contain the same unique samples")
-    datasets = {item["name"]: item for item in config["datasets"]}
+    datasets = {}
+    for item in config["datasets"]:
+        datasets[item["name"]] = item
     for row in qc:
         sample = row["sample_id"]
         original = by_sample[sample]

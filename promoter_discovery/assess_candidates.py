@@ -149,7 +149,12 @@ def transcription_groups(tus):
         names = [gene.strip().lower() for gene in genes.split(";") if gene.strip()]
         graph.add_nodes_from(names)
         graph.add_edges_from(zip(names, names[1:]))
-    return {gene: ";".join(sorted(component)) for component in nx.connected_components(graph) for gene in component}
+    groups = {}
+    for component in nx.connected_components(graph):
+        group_name = ";".join(sorted(component))
+        for gene in component:
+            groups[gene] = group_name
+    return groups
 
 
 def operon_support(enrichment, groups):
