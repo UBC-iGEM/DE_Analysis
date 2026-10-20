@@ -49,7 +49,7 @@ The companion curation file is created when reviews are saved. Back it up
 alongside the scientific artifacts: an identical-run rebuild restores reviews,
 while a changed run retains earlier history without applying old approvals.
 
-Schema 12 adds source-linked identifier mappings, cited exposure context, code
+Schema 12 adds source-linked identifier mappings, documented exposure context, code
 fingerprints and stronger run consistency. Rebuild with
 `python -m promoter_discovery.build_database` while curation writers are stopped.
 Older scientific snapshots are backed up before replacement; review history

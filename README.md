@@ -189,14 +189,14 @@ retains old review history in the companion file and superseded scientific
 databases in `results/database_snapshots/<database-stem>/`. Back up both.
 Stop curation writers and active explorer connections before rebuilding.
 
-Schema 12 adds source-linked identifier associations, cited sample-exposure
+Schema 12 adds source-linked identifier associations, documented sample-exposure
 context, composite run–contrast constraints, and executing-code fingerprints.
 Search resolves `b0113` to `pdhR` while retaining the source locus. Ambiguous
 identifiers return all search hits; single-record lookup requires an explicit
 candidate ID. Unknown doses and sampling durations remain null.
 
 `config/study_context.json` records the source study's MHB/mid-logarithmic context
-and IC50 dose basis, with citation and curation notes. Numeric doses from Table S1
+and IC50 dose basis, with source and curation notes. Numeric doses from Table S1
 have not been curated, and elapsed RNA-sampling exposure times remain unknown.
 Sample metadata retain replicate labels and their provenance.
 
@@ -244,7 +244,6 @@ revision for the original expression fit.
 | `results/` | Ignored generated artifacts and local curation archive; [guide](results/README.md) |
 | `tests/` | Synthetic scientific-contract, database, CLI, and workflow regressions |
 
-Wiki design assets and write-up drafts stay in the ignored `wiki_assets/` folder.
 The optional PRECISE-1K context module and its separate manifests remain available;
 they are not part of the primary antibiotic benchmark. The custom dataset runner
 is `python -m promoter_discovery.input_data --config <config>`; the importer and
@@ -267,21 +266,10 @@ screening layer can link construct/version → plate/well → exposure/replicate
 measurement to existing candidate and promoter IDs; this experimental layer is
 not implemented yet.
 
-## License and citation
+## Data terms
 
-Project-authored code and documentation use the [MIT license](LICENSE).
-**Third-party data and typefaces are excluded from that grant.** RegulonDB data, the GEO source
-archive, PRECISE-1K, and the GenBank genome retain their providers' terms; see
+RegulonDB data, the GEO source archive, PRECISE-1K, and the GenBank genome retain
+their providers' terms; see
 `config/*assets.json` and the [data inventory](data/README.md). Review those terms
 before distributing a populated database. The fictional demo avoids redistribution
-of reference records. Use [CITATION.cff](CITATION.cff) for software attribution and
-also cite the original dataset and methods:
-
-- [GSE220559 study, Microbiology Spectrum (2023)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10100721/)
-- [RegulonDB v12.0 resource paper, Nucleic Acids Research (2024)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10767902/) — background citation; the imported release is 14.5.0.
-- [PyDESeq2, Bioinformatics (2023)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10502239/)
-
-For an iGEM Software submission, the team must also host the reviewed release in
-its dedicated iGEM GitLab software repository and link its wiki software page;
-a GitHub repository alone does not meet the current hosting requirement.
-See the [official Software award requirements](https://competition.igem.org/judging/special-prizes).
+of reference records.

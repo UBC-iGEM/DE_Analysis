@@ -1,4 +1,4 @@
-"""Import cited biological context and source identifier associations."""
+"""Import documented biological context and source identifier associations."""
 
 from __future__ import annotations
 

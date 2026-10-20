@@ -20,7 +20,6 @@
       "remote_name": "NetworkRegulatorGene",
       "path": "data/references/regulondb/network_regulator_gene.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation; see https://regulondb.ccg.unam.mx/",
       "asset_id": "NetworkRegulatorGene"
     },
     {
@@ -30,7 +29,6 @@
       "remote_name": "NetworkSigmaGene",
       "path": "data/references/regulondb/network_sigma_gene.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation; see https://regulondb.ccg.unam.mx/",
       "asset_id": "NetworkSigmaGene"
     },
     {
@@ -41,7 +39,6 @@
       "path": "data/references/regulondb/GeneProductAllIdentifiersSet.tsv",
       "derived_path": "data/references/regulondb/network_gene_mapping.tsv",
       "license": "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0); https://creativecommons.org/licenses/by-nc/4.0/",
-      "citation": "Santos-Zavaleta A. et al. RegulonDB v12.0: updated transcriptional regulation database for Escherichia coli K-12. Nucleic Acids Res. 2024.",
       "asset_id": "GeneProductAllIdentifiersSet"
     },
     {
@@ -51,7 +48,6 @@
       "remote_name": "TUSet",
       "path": "data/references/regulondb/TUSet.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation; https://regulondb.ccg.unam.mx/",
       "asset_id": "TUSet"
     },
     {
@@ -61,7 +57,6 @@
       "remote_name": "PromoterSet",
       "path": "data/references/regulondb/PromoterSet.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation; https://regulondb.ccg.unam.mx/",
       "asset_id": "PromoterSet"
     },
     {
@@ -71,7 +66,6 @@
       "remote_name": "RISet",
       "path": "data/references/regulondb/RISet.tsv",
       "license": "RegulonDB terms and conditions",
-      "citation": "RegulonDB release citation; https://regulondb.ccg.unam.mx/",
       "asset_id": "RISet"
     },
     {
@@ -82,7 +76,6 @@
       "path": "data/references/ecoli_mg1655/U00096.3.fasta",
       "source_revision": "U00096.3",
       "license": "NCBI sequence data-use policy; https://www.ncbi.nlm.nih.gov/home/about/policies/",
-      "citation": "E. coli K-12 MG1655 complete genome, GenBank U00096.3",
       "asset_id": "U00096.3"
     }
   ]

@@ -328,7 +328,7 @@ def test_manifest_versions_and_matching_release_without_hand_entered_hashes(tmp_
         ("model", "imodulon", model, "1.0", "v1.0"),
         ("expr", "expression", expression, "1.0", "v1.0"),
     ):
-        assets.append({"name": name, "kind": kind, "provider": "file", "url": path.as_uri(), "path": path.name, "dataset_release": release, "source_revision": revision, "license": "test", "citation": "test", "asset_id": "rdb" if kind == "regulondb" else "imod"})
+        assets.append({"name": name, "kind": kind, "provider": "file", "url": path.as_uri(), "path": path.name, "dataset_release": release, "source_revision": revision, "license": "test", "asset_id": "rdb" if kind == "regulondb" else "imod"})
     manifest = {"minimum_versions": {"regulondb": "14.5.0", "precise1k": "1.0"}, "assets": assets}
     assert not validate_manifest(manifest, tmp_path)
     assets[-1]["source_revision"] = "v2.0"

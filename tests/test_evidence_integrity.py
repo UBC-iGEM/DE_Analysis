@@ -55,7 +55,7 @@ def test_cross_run_de_and_replicate_contrasts_are_rejected(tmp_path):
         c.close()
 
 
-def test_sample_context_preserves_unknown_values_and_cites_its_source(database_root, tmp_path):
+def test_sample_context_preserves_unknown_values_and_records_its_source(database_root, tmp_path):
     with Database(importer.build_database(database_root, tmp_path / "db.sqlite"), read_only=True) as db:
         row = db.sample_qc()[0]
         assert row["replicate"] == "1"
