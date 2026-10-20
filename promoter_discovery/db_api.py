@@ -13,6 +13,23 @@ from .database import DEFAULT_DATABASE, SCHEMA_VERSION, open_database, schema_ve
 from .curation import archive_path, archive_review, attach_archive, review_history
 
 
+CURATION_TABLES = frozenset({"curation_edits", "candidate_reviews", "promoter_reviews"})
+WRITE_ACTIONS = frozenset({sqlite3.SQLITE_INSERT, sqlite3.SQLITE_UPDATE, sqlite3.SQLITE_DELETE})
+
+
+def _curation_only_authorizer(action, table, _column, database_name, _source):
+    """Allow append-only review writes and reject scientific-record changes."""
+    if action not in WRITE_ACTIONS:
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_INSERT and database_name == "main" and table in CURATION_TABLES:
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_INSERT and database_name == "curation_archive" and table == "review_history":
+        return sqlite3.SQLITE_OK
+    if database_name == "curation_archive" and table == "sqlite_master":
+        return sqlite3.SQLITE_OK
+    return sqlite3.SQLITE_DENY
+
+
 class Database:
     """Convenience queries that return dictionaries suitable for scripts or JSON."""
 
@@ -32,6 +49,7 @@ class Database:
                 raise
         else:
             self.connection = open_database(self.path)
+            self.connection.set_authorizer(_curation_only_authorizer)
 
     def __enter__(self):
         return self

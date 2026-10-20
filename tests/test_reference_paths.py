@@ -1,3 +1,7 @@
+"""Verify regulator-to-promoter paths and analysis-run isolation."""
+
+import sqlite3
+
 from promoter_discovery.build_database import build_database
 from promoter_discovery.db_api import Database
 
@@ -40,12 +44,13 @@ def test_candidate_graph_keeps_direct_targets_and_excludes_sibling_gene_effects(
 
 
 def test_queries_default_to_one_completed_run(extended_database_root, tmp_path):
-    database = Database(build_database(extended_database_root, tmp_path / "project.sqlite"))
-    original = database.runs()[0]["run_id"]
-    with database.connection:
-        database.connection.execute("INSERT INTO analysis_runs(run_id,created_at,status) VALUES ('new','2099-01-01','complete')")
-        database.connection.execute("INSERT INTO candidates(run_id,candidate_id,gene_id,antibiotic_class) VALUES ('new','genea','genea','aminoglycoside')")
-        database.connection.execute("INSERT INTO regulatory_interactions(interaction_id,run_id,actor_id,interaction_type,target_kind,gene_id,effect,source_release,source_json) VALUES ('new-i','new','R2','sRNA-gene','gene','genea','repressor','14.5.0','{}')")
+    path = build_database(extended_database_root, tmp_path / "project.sqlite")
+    with sqlite3.connect(path) as connection:
+        original = connection.execute("SELECT run_id FROM analysis_runs").fetchone()[0]
+        connection.execute("INSERT INTO analysis_runs(run_id,created_at,status) VALUES ('new','2099-01-01','complete')")
+        connection.execute("INSERT INTO candidates(run_id,candidate_id,gene_id,antibiotic_class) VALUES ('new','genea','genea','aminoglycoside')")
+        connection.execute("INSERT INTO regulatory_interactions(interaction_id,run_id,actor_id,interaction_type,target_kind,gene_id,effect,source_release,source_json) VALUES ('new-i','new','R2','sRNA-gene','gene','genea','repressor','14.5.0','{}')")
+    database = Database(path)
     assert [row["run_id"] for row in database.search_candidates()] == ["new"]
     assert database.get_candidate("genea")["run_id"] == "new"
     assert {row["run_id"] for row in database.reference_promoter_paths("RyhB")} == {"new"}

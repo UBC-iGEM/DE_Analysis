@@ -1,3 +1,5 @@
+"""Load count data, validate samples, and run one configured DE analysis."""
+
 import argparse
 import gzip
 import io

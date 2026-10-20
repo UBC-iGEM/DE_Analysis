@@ -1,3 +1,5 @@
+"""Verify the SQLite schema, constraints, and connection helpers."""
+
 import sqlite3
 
 import pytest

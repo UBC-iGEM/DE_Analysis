@@ -1,4 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!-- PRISM explorer header showing evidence flowing into promoter selection. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="4200" height="2470" viewBox="-236 -100 4200 2470" fill="none">
 <rect x="-236" y="-100" width="4200" height="2470" fill="#1B1F41" /><path d="M7.5 574.5H899.5V1296.5H7.5V574.5Z" stroke-width="15" stroke="#6A67FF" />
 <path d="M1568 505L1289 445L1568 379H2160L2439 445L2160 505Z" fill="url(#paint0_linear_124_428)" />

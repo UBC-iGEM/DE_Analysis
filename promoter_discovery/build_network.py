@@ -388,7 +388,11 @@ def aggregate_candidate_evidence(observations: pd.DataFrame, config: dict[str, A
             tier = "multiple_comparisons_supported"
         else:
             tier = "single_comparison_supported"
-        caveats = sorted({c for dataset in group["source_dataset"].unique() for c in dataset_caveats(dataset)})
+        caveat_values = set()
+        for dataset in group["source_dataset"].unique():
+            for caveat in dataset_caveats(dataset):
+                caveat_values.add(caveat)
+        caveats = sorted(caveat_values)
         caveats += [d["caveat"] for d in config["datasets"] if d["name"] in set(group.source_dataset) and d.get("caveat")]
         flags: list[str] = []
         if direction_conflict:

@@ -210,14 +210,16 @@ The report records input hashes; the baseline choices are exported as CSV.
 
 ### Manual curation
 
-Measurements remain imported evidence. Reviews append status, priority, notes,
-construct readiness, editor, timestamp, reason, and optional source reference.
+Measurements remain imported evidence. The public API rejects updates and
+deletions to scientific tables. Reviews are append-only records containing
+status, priority, notes, construct readiness, reviewer label, timestamp, reason,
+and an optional source reference.
 
 ```bash
 python -m promoter_discovery.db_cli --json candidate pdhr
 # Use the run ID returned above:
 python -m promoter_discovery.db_cli review-candidate pdhr reviewed \
-  --run-id <run-id> --editor "Your name" --reason "Checked reference evidence"
+  --run-id <run-id> --editor "team-reviewer" --reason "Checked reference evidence"
 python -m promoter_discovery.db_cli --json history candidate pdhr
 ```
 

@@ -19,10 +19,14 @@ def source_provenance() -> dict:
     """
     root = Path(__file__).resolve().parents[1]
     paths = sorted((root / "promoter_discovery").glob("*.py"))
-    paths += [root / name for name in ("requirements.txt", "requirements-lock.txt")
-              if (root / name).is_file()]
-    manifest = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in paths}
+    for name in ("requirements.txt", "requirements-lock.txt"):
+        path = root / name
+        if path.is_file():
+            paths.append(path)
+    manifest = {}
+    for path in paths:
+        relative_path = path.relative_to(root).as_posix()
+        manifest[relative_path] = hashlib.sha256(path.read_bytes()).hexdigest()
     digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
     revision, dirty = None, None
     try:

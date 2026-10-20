@@ -25,13 +25,15 @@ def test_source_identifiers_resolve_without_collapsing_loci(database_root, tmp_p
 
 
 def test_ambiguous_identifier_returns_all_search_hits_but_never_picks_one(database_root, tmp_path):
-    with Database(importer.build_database(database_root, tmp_path / "db.sqlite")) as db:
-        run = db.runs()[0]["run_id"]
-        db.connection.execute("INSERT INTO candidates(run_id,candidate_id,gene_id,antibiotic_class) VALUES (?,'geneb','geneb','beta_lactam')", (run,))
-        db.connection.execute(
+    path = importer.build_database(database_root, tmp_path / "db.sqlite")
+    with sqlite3.connect(path) as connection:
+        run = connection.execute("SELECT run_id FROM analysis_runs").fetchone()[0]
+        connection.execute("INSERT INTO candidates(run_id,candidate_id,gene_id,antibiotic_class) VALUES (?,'geneb','geneb','beta_lactam')", (run,))
+        connection.execute(
             "INSERT INTO gene_identifiers SELECT run_id,'geneb',namespace,identifier,source_asset_id,source_row,source_release,mapping_basis "
             "FROM gene_identifiers WHERE identifier='b0001'"
         )
+    with Database(path) as db:
         assert {row["candidate_id"] for row in db.search_candidates(query="b0001")} == {"genea", "geneb"}
         with pytest.raises(ValueError, match="Ambiguous identifier"):
             db.get_candidate("b0001")

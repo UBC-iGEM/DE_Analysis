@@ -1,3 +1,5 @@
+"""Verify regulatory-reference parsing, network construction, and provenance."""
+
 import json
 import ssl
 from pathlib import Path

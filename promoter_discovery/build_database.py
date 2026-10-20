@@ -46,7 +46,13 @@ def _read_reference(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         reader.fieldnames = [name.split(")", 1)[-1].strip() for name in reader.fieldnames or []]
-        return [{key: value.strip() for key, value in row.items()} for row in reader]
+        rows = []
+        for row in reader:
+            cleaned = {}
+            for key, value in row.items():
+                cleaned[key] = value.strip()
+            rows.append(cleaned)
+        return rows
 
 
 def _number(value: str | None, default=None):

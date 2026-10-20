@@ -48,6 +48,8 @@ The database includes a source-validated reference coverage report.
 The companion curation file is created when reviews are saved. Back it up
 alongside the scientific artifacts: an identical-run rebuild restores reviews,
 while a changed run retains earlier history without applying old approvals.
+The PRISM API rejects updates and deletions to scientific records and only
+allows append-only curation entries.
 
 Schema 12 adds source-linked identifier mappings, documented exposure context, code
 fingerprints and stronger run consistency. Rebuild with

@@ -1,3 +1,5 @@
+"""Verify append-only candidate and promoter review history."""
+
 from promoter_discovery.build_database import build_database
 from promoter_discovery.db_api import Database
 from promoter_discovery.curation import archive_path

@@ -1,3 +1,5 @@
+"""Verify database imports, validation, and atomic replacement behavior."""
+
 import sqlite3
 import pickle
 import csv

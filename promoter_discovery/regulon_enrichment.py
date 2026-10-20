@@ -44,8 +44,13 @@ def compute_regulon_enrichment(graph):
         # remain visible in provenance but cannot count in either directional set.
         universe = set(eligible.canonical_gene)
         directions = eligible[eligible.is_significant].groupby("canonical_gene").regulation.agg(set)
-        response = {direction: {gene for gene, signs in directions.items() if signs == {direction}}
-                    for direction in ("upregulated", "downregulated")}
+        response = {}
+        for direction in ("upregulated", "downregulated"):
+            genes = set()
+            for gene, signs in directions.items():
+                if signs == {direction}:
+                    genes.add(gene)
+            response[direction] = genes
         for regulator, edges in sorted(regulons.items()):
             targets = set(edges) & universe
             if not targets:
